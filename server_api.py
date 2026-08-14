@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from aiohttp import web
+from server import PromptServer
+
+from .wildcard_engine import build_catalog
+
+
+@PromptServer.instance.routes.get("/wildcard-sequencer/wildcards")
+async def get_wildcard_catalog(request: web.Request) -> web.Response:
+    directory = request.query.get("root", "wildcards")
+    try:
+        root, items = build_catalog(directory)
+    except (OSError, ValueError) as error:
+        return web.json_response({"error": str(error), "items": []}, status=400)
+
+    return web.json_response(
+        {
+            "root": str(root),
+            "items": [
+                {
+                    "token": item.token,
+                    "path": item.path,
+                    "preview": list(item.preview),
+                    "search_text": item.search_text,
+                }
+                for item in items
+            ],
+        }
+    )

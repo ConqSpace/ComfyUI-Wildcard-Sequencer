@@ -1,0 +1,12 @@
+[project]
+name = "comfyui-wildcard-sequencer"
+version = "0.1.0"
+description = "검색형 와일드카드 템플릿과 이미지 수량 기반 순차 프롬프트 노드"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.comfy]
+PublisherId = "local"
+DisplayName = "Wildcard Sequencer"
+Icon = ""
