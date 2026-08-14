@@ -6,6 +6,9 @@ const 시퀀서_노드 = "WSQ_WildcardSequencer";
 const 최근_저장소_키 = "wsq.wildcard-picker.recent.v1";
 const 최근_최대_개수 = 8;
 const 검색_최대_개수 = 40;
+const 검색기_열림_속성 = "wsq_picker_expanded";
+const 검색기_접힌_높이 = 40;
+const 검색기_펼친_높이 = 238;
 let 선택기_일련번호 = 0;
 
 function 세션_식별자_만들기() {
@@ -129,17 +132,90 @@ function 스타일_설치() {
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
-            gap: 6px;
             width: 100%;
             min-width: 280px;
-            height: 238px;
-            padding: 7px;
+            height: ${검색기_펼친_높이}px;
+            padding: 5px 7px 7px;
             overflow: hidden;
             color: var(--fg-color, #ddd);
             background: var(--comfy-menu-bg, #202020);
             border: 1px solid var(--border-color, #555);
             border-radius: 7px;
             font: 12px/1.35 system-ui, sans-serif;
+        }
+
+        .wsq-picker[data-collapsed="true"] {
+            height: ${검색기_접힌_높이}px;
+            padding-bottom: 5px;
+        }
+
+        .wsq-picker__toggle {
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: 16px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            min-height: 28px;
+            padding: 3px 2px;
+            color: inherit;
+            text-align: left;
+            background: transparent;
+            border: 0;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .wsq-picker__toggle:hover {
+            background: var(--comfy-input-bg, #303030);
+        }
+
+        .wsq-picker__toggle:active {
+            transform: scale(.99);
+        }
+
+        .wsq-picker__toggle:focus-visible,
+        .wsq-picker__search:focus-visible,
+        .wsq-picker__refresh:focus-visible,
+        .wsq-picker__item:focus-visible {
+            outline: 2px solid var(--p-primary-color, #6da7ff);
+            outline-offset: 1px;
+        }
+
+        .wsq-picker__chevron {
+            color: var(--descrip-text, #aaa);
+            text-align: center;
+        }
+
+        .wsq-picker__toggle-label {
+            overflow: hidden;
+            font-weight: 650;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .wsq-picker__count {
+            color: var(--descrip-text, #aaa);
+            font-size: 11px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .wsq-picker__count[data-kind="error"] {
+            color: var(--error-text, #ff8989);
+        }
+
+        .wsq-picker__content {
+            display: flex;
+            flex: 1 1 auto;
+            flex-direction: column;
+            gap: 6px;
+            min-height: 0;
+            padding-top: 4px;
+        }
+
+        .wsq-picker__content[hidden] {
+            display: none;
         }
 
         .wsq-picker__search-row {
@@ -162,13 +238,6 @@ function 스타일_설치() {
             min-width: 0;
             padding: 4px 8px;
             outline: none;
-        }
-
-        .wsq-picker__search:focus-visible,
-        .wsq-picker__refresh:focus-visible,
-        .wsq-picker__item:focus-visible {
-            outline: 2px solid var(--p-primary-color, #6da7ff);
-            outline-offset: 1px;
         }
 
         .wsq-picker__refresh {
@@ -451,10 +520,34 @@ function 와일드카드_선택기_연결(node) {
     스타일_설치();
     선택기_일련번호 += 1;
     const 결과_식별자 = `wsq-results-${선택기_일련번호}`;
+    const 내용_식별자 = `wsq-picker-content-${선택기_일련번호}`;
 
     const root = document.createElement("section");
     root.className = "wsq-picker";
     root.setAttribute("aria-label", "와일드카드 검색 선택기");
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "wsq-picker__toggle";
+    toggle.setAttribute("aria-controls", 내용_식별자);
+
+    const chevron = document.createElement("span");
+    chevron.className = "wsq-picker__chevron";
+    chevron.setAttribute("aria-hidden", "true");
+
+    const toggleLabel = document.createElement("span");
+    toggleLabel.className = "wsq-picker__toggle-label";
+    toggleLabel.textContent = "와일드카드 검색";
+
+    const itemCount = document.createElement("span");
+    itemCount.className = "wsq-picker__count";
+    itemCount.textContent = "…";
+
+    toggle.append(chevron, toggleLabel, itemCount);
+
+    const content = document.createElement("div");
+    content.id = 내용_식별자;
+    content.className = "wsq-picker__content";
 
     const searchRow = document.createElement("div");
     searchRow.className = "wsq-picker__search-row";
@@ -486,7 +579,8 @@ function 와일드카드_선택기_연결(node) {
     results.setAttribute("role", "listbox");
     results.setAttribute("aria-label", "와일드카드 검색 결과");
 
-    root.append(searchRow, status, results);
+    content.append(searchRow, status, results);
+    root.append(toggle, content);
 
     const 커서 = 템플릿_선택_추적(templateWidget);
     let 항목들 = [];
@@ -495,6 +589,43 @@ function 와일드카드_선택기_연결(node) {
     let 요청_번호 = 0;
     let 현재_디렉터리 = 문자열_정리(directoryWidget.value);
     let 검색_프레임 = 0;
+    let 펼침 = false;
+
+    const 노드_크기_맞추기 = () => {
+        requestAnimationFrame(() => {
+            const 계산_크기 = node.computeSize?.() ?? node.size;
+            node.setSize?.([
+                Math.max(node.size?.[0] ?? 0, 340),
+                계산_크기?.[1] ?? node.size?.[1] ?? 0,
+            ]);
+            node.setDirtyCanvas?.(true, true);
+        });
+    };
+
+    const 펼침_적용 = (다음_펼침, 저장 = false, 포커스 = false) => {
+        펼침 = Boolean(다음_펼침);
+        root.dataset.collapsed = String(!펼침);
+        content.hidden = !펼침;
+        toggle.setAttribute("aria-expanded", String(펼침));
+        toggle.title = 펼침 ? "와일드카드 검색 접기" : "와일드카드 검색 펼치기";
+        chevron.textContent = 펼침 ? "▾" : "▸";
+
+        if (저장) {
+            node.properties ??= {};
+            node.properties[검색기_열림_속성] = 펼침;
+            app.graph?.setDirtyCanvas?.(true, true);
+        }
+
+        노드_크기_맞추기();
+        if (펼침 && 포커스) {
+            requestAnimationFrame(() => search.focus({ preventScroll: true }));
+        }
+    };
+
+    const 헤더_상태_표시 = (text, kind) => {
+        itemCount.textContent = text;
+        itemCount.dataset.kind = kind;
+    };
 
     const 선택_삽입 = (item) => {
         와일드카드_삽입(templateWidget, item, node, 커서.상태);
@@ -504,6 +635,7 @@ function 와일드카드_선택기_연결(node) {
 
     const 그리기 = () => {
         if (불러오는_중) {
+            헤더_상태_표시("불러오는 중", "loading");
             status.dataset.kind = "loading";
             status.textContent = "와일드카드를 불러오는 중…";
             메시지_표시(results, "목록을 불러오는 중입니다.");
@@ -511,11 +643,14 @@ function 와일드카드_선택기_연결(node) {
         }
 
         if (오류) {
+            헤더_상태_표시("오류", "error");
             status.dataset.kind = "error";
             status.textContent = 오류;
             메시지_표시(results, "목록을 불러오지 못했습니다.");
             return;
         }
+
+        헤더_상태_표시(`${항목들.length}개`, "ready");
 
         const query = search.value.trim();
         const 검색_결과 = (query
@@ -625,6 +760,10 @@ function 와일드카드_선택기_연결(node) {
             }
         }
     });
+    toggle.addEventListener("click", () => {
+        const 다음_펼침 = !펼침;
+        펼침_적용(다음_펼침, true, 다음_펼침);
+    });
     refresh.addEventListener("click", () => 목록_불러오기(true));
 
     const 기존_디렉터리_호출 = directoryWidget.callback;
@@ -639,9 +778,19 @@ function 와일드카드_선택기_연결(node) {
     node.addDOMWidget("wildcard_picker", "WSQ_WILDCARD_PICKER", root, {
         serialize: false,
         hideOnZoom: true,
-        getMinHeight: () => 238,
-        getHeight: () => 238,
+        getMinHeight: () =>
+            펼침 ? 검색기_펼친_높이 : 검색기_접힌_높이,
+        getHeight: () =>
+            펼침 ? 검색기_펼친_높이 : 검색기_접힌_높이,
     });
+
+    const 기존_구성 = node.onConfigure;
+    node.onConfigure = function (정보) {
+        const 반환값 = 기존_구성?.apply(this, arguments);
+        const 저장된_펼침 = 정보?.properties?.[검색기_열림_속성] === true;
+        펼침_적용(저장된_펼침);
+        return 반환값;
+    };
 
     const 기존_제거 = node.onRemoved;
     node.onRemoved = function () {
@@ -651,14 +800,8 @@ function 와일드카드_선택기_연결(node) {
         return 기존_제거?.apply(this, arguments);
     };
 
-    requestAnimationFrame(() => {
-        const 계산_크기 = node.computeSize?.() ?? node.size;
-        node.setSize?.([
-            Math.max(node.size?.[0] ?? 0, 340),
-            Math.max(node.size?.[1] ?? 0, 계산_크기?.[1] ?? 0),
-        ]);
-        목록_불러오기(true);
-    });
+    펼침_적용(node.properties?.[검색기_열림_속성] === true);
+    목록_불러오기(true);
 }
 
 app.registerExtension({
