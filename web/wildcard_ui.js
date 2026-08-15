@@ -1,8 +1,13 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { 템플릿_관리자_연결 } from "./template_manager_ui.js";
 
 const 템플릿_노드 = "WSQ_WildcardTemplate";
-const 시퀀서_노드 = "WSQ_WildcardSequencer";
+const 템플릿_관리자_노드 = "WSQ_WildcardTemplateManager";
+const 시퀀서_노드들 = new Set([
+    "WSQ_WildcardSequenceRunner",
+    "WSQ_WildcardSequencer",
+]);
 const 검색_최대_개수 = 40;
 const 검색기_열림_속성 = "wsq_picker_expanded";
 const 검색기_접힌_높이 = 40;
@@ -671,9 +676,11 @@ app.registerExtension({
         const 노드_종류 =
             node.comfyClass ?? node.constructor?.comfyClass ?? node.type;
 
-        if (노드_종류 === 템플릿_노드) {
+        if (노드_종류 === 템플릿_관리자_노드) {
+            템플릿_관리자_연결(node);
+        } else if (노드_종류 === 템플릿_노드) {
             와일드카드_선택기_연결(node);
-        } else if (노드_종류 === 시퀀서_노드) {
+        } else if (시퀀서_노드들.has(노드_종류)) {
             시퀀서_직렬화_연결(node);
         }
     },

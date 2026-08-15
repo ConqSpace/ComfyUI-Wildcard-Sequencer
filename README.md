@@ -1,22 +1,23 @@
 # ComfyUI Wildcard Sequencer
 
-와일드카드를 검색해서 프롬프트 템플릿을 만들고, 템플릿별 이미지 할당량에 따라 순서대로 실행하는 ComfyUI 커스텀 노드입니다.
+여러 와일드카드 프롬프트를 한 노드에서 정리하고, 템플릿별 이미지 할당량에 따라 순서대로 실행하는 ComfyUI 커스텀 노드입니다.
 
 ```text
-[Wildcard Template A · 50장] ─┐
-[Wildcard Template B · 50장] ─┼─> [Wildcard Sequencer] ─> CLIP Text Encode
-[Wildcard Template C · 50장] ─┘
+[Wildcard Template Manager] ─> [Wildcard Sequencer] ─> CLIP Text Encode
+  ├─ 50장 · portrait of __characters__
+  ├─ 50장 · __styles/lighting__ photo of __characters__
+  └─ 50장 · cinematic __camera/angle__
 ```
 
 ## 주요 기능
 
-- 와일드카드, 여러 와일드카드의 조합, 일반 문장과 와일드카드의 조합 지원
-- 불편한 파일 드롭다운 대신 와일드카드 토큰명 검색
-- 검색 패널을 접어 Template 노드를 작게 유지하고, 노드별 열림 상태 저장
-- 검색 결과 클릭 또는 `Enter`로 현재 커서 위치에 토큰 삽입
-- 각 템플릿에 지정한 이미지 수만큼 실행한 뒤 다음 템플릿으로 이동
-- 마지막 템플릿까지 실행하면 처음부터 다시 순환
-- 새 Queue 작업마다 첫 번째 템플릿부터 다시 시작
+- 한 Manager 노드에서 템플릿 추가, 삭제, 드래그 정렬
+- 각 템플릿에 와일드카드 하나, 여러 와일드카드, 일반 문장을 자유롭게 조합
+- 불편한 파일 드롭다운 대신 공유 검색창에서 와일드카드 토큰명 검색
+- 검색 결과 클릭 또는 `Enter`로 현재 선택한 프롬프트의 커서 위치에 토큰 삽입
+- 각 템플릿에 지정한 이미지 수만큼 실행한 뒤 다음 행으로 이동
+- 마지막 행까지 실행하면 처음부터 다시 순환
+- 새 Queue 작업마다 첫 번째 행부터 다시 시작
 - 이미지마다 각 와일드카드를 독립적으로 무작위 추첨
 - 중첩 와일드카드 및 하위 폴더 지원
 
@@ -31,18 +32,19 @@ git clone https://github.com/ConqSpace/ComfyUI-Wildcard-Sequencer.git
 
 ComfyUI를 재시작하고 브라우저를 강력 새로고침하세요. 별도 Python 패키지는 필요하지 않습니다.
 
-이 확장은 최신 ComfyUI V3 노드 API와 Autogrow 입력을 사용하므로 최신 버전의 ComfyUI를 권장합니다.
+이 확장은 최신 ComfyUI V3 노드 API를 사용하므로 최신 버전의 ComfyUI를 권장합니다.
 
 ## 빠른 사용법
 
-1. `Wildcard Template` 노드를 필요한 만큼 추가합니다.
-2. 각 노드에 프롬프트와 `이미지 수`를 설정합니다.
-3. Template 노드들을 `Wildcard Sequencer`에 실행할 순서대로 연결합니다.
-4. Sequencer의 `prompt` 출력을 `CLIP Text Encode`에 연결합니다.
-5. `Empty Latent Image` 등의 `batch_size`를 `1`로 설정합니다.
-6. ComfyUI의 Run/Queue Batch Count에 전체 생성량을 입력하고 Queue를 실행합니다.
+1. `Wildcard Template Manager`와 `Wildcard Sequencer`를 하나씩 추가합니다.
+2. Manager의 `+ 템플릿`으로 행을 만들고 각 행의 이미지 수와 프롬프트를 입력합니다.
+3. `≡` 핸들을 드래그해 실행 순서를 정합니다. 필요 없는 행은 `×`로 제거합니다.
+4. Manager의 `templates` 출력을 Sequencer의 `templates` 입력에 연결합니다.
+5. Sequencer의 `prompt` 출력을 `CLIP Text Encode`에 연결합니다.
+6. `Empty Latent Image` 등의 `batch_size`를 `1`로 설정합니다.
+7. ComfyUI의 Run/Queue Batch Count에 전체 생성량을 입력하고 Queue를 실행합니다.
 
-연결을 끊은 Template은 즉시 순서에서 제외됩니다. 중간 연결을 제거해도 남은 연결끼리 빈자리 없이 다시 순환합니다.
+`토큰 찾기`를 펼치고 검색 결과를 선택하면 마지막으로 편집한 프롬프트의 커서 위치에 `__token__`이 들어갑니다. 검색은 경로나 파일 내용이 아니라 토큰명만 대상으로 하며, 여러 단어는 모두 포함된 결과만 보여줍니다.
 
 ## 실행 예시
 
@@ -52,14 +54,7 @@ B: __styles/lighting__ photo of __characters__  50장
 C: cinematic __camera/angle__                   50장
 ```
 
-Run/Queue Batch Count가 `100`이면:
-
-```text
-0~49   A
-50~99  B
-```
-
-총 생성량이 100장이므로 C에는 도달하지 않습니다. `150`장이면 A → B → C를 각각 50장씩 실행하고, `200`장이면 다음처럼 다시 A로 순환합니다.
+Run/Queue Batch Count가 `100`이면 A 50장 다음 B 50장을 생성하고 C에는 도달하지 않습니다. `150`장이면 A → B → C를 각각 50장씩 실행합니다. `200`장이면 다음처럼 다시 A로 순환합니다.
 
 ```text
 0~49     A
@@ -72,21 +67,23 @@ Queue 버튼을 다시 누르면 이전 작업의 다음 순서가 아니라 A�
 
 ## 노드
 
-### Wildcard Template
+### Wildcard Template Manager
 
-- 일반 문장과 `__wildcard__` 토큰을 함께 작성합니다.
-- 검색 결과에서 와일드카드를 선택하면 프롬프트 편집기의 현재 커서 위치에 삽입됩니다.
-- `토큰 찾기` 헤더를 누르면 검색 패널을 열거나 닫을 수 있습니다.
-- 패널을 펼치면 검색창에 자동으로 포커스되며, 저장한 워크플로를 다시 열어도 노드별 상태가 복원됩니다.
-- 해당 템플릿을 연속으로 사용할 이미지 수를 설정합니다.
-- 출력은 전용 `WILDCARD_TEMPLATE` 타입이므로 일반 문자열 소켓과 섞이지 않습니다.
+- 행 하나가 완성된 프롬프트 템플릿 하나입니다.
+- 각 행의 숫자는 해당 프롬프트를 연속으로 사용할 이미지 수입니다.
+- 행 안에는 일반 문장과 `__wildcard__` 토큰을 원하는 만큼 섞을 수 있습니다.
+- `≡` 드래그 순서가 실행 순서이며 `×`를 누르면 그 행이 순환에서 빠집니다.
+- 하단에는 모든 행의 이미지 할당량 합계를 표시합니다.
+- 출력은 전용 `WILDCARD_TEMPLATE_SEQUENCE` 타입입니다.
 
 ### Wildcard Sequencer
 
-- Template을 연결할 때마다 입력 소켓이 자동으로 늘어납니다.
-- 연결된 소켓 순서가 실행 순서입니다.
+- Manager 출력 하나만 받습니다.
 - `seed`와 작업 내 이미지 번호가 같으면 같은 결과를 재현합니다.
 - Queue 작업이 새로 시작되면 순서 카운터는 0으로 초기화됩니다.
+- 작업 내 이미지 번호와 Queue 작업 ID는 브라우저 확장이 자동으로 기록합니다.
+
+이전 버전의 `Wildcard Template` 여러 개와 Autogrow 방식 `Wildcard Sequencer`도 저장된 워크플로 호환을 위해 deprecated 노드로 남아 있습니다. 새 워크플로에는 Manager 방식을 사용하세요.
 
 ## 와일드카드 파일
 
@@ -96,7 +93,7 @@ Queue 버튼을 다시 누르면 이전 작업의 다음 순서가 아니라 A�
 2. 이 확장의 `wildcards`
 3. 현재 작업 디렉터리의 `wildcards`
 
-Template 노드의 고급 입력 `와일드카드 폴더`에서 절대 경로나 다른 상대 경로를 지정할 수도 있습니다.
+Manager 노드의 고급 입력 `와일드카드 폴더`에서 절대 경로나 다른 상대 경로를 지정할 수도 있습니다.
 
 ```text
 wildcards/
@@ -145,6 +142,8 @@ __styles/lighting.txt__
 
 ```powershell
 py -3.12 -m unittest discover -s tests -v
+node --check web/wildcard_ui.js
+node --check web/template_manager_ui.js
 ```
 
-현재 테스트는 템플릿 경계와 재순환, 연결 제거, 시드 재현성, 중첩 와일드카드, 경로 이탈 및 순환 참조 방지를 검증합니다.
+테스트는 템플릿 데이터 직렬화, 경계와 재순환, 연결 제거, 시드 재현성, 중첩 와일드카드, 경로 이탈 및 순환 참조 방지를 검증합니다.
