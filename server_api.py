@@ -22,7 +22,6 @@ async def get_wildcard_catalog(request: web.Request) -> web.Response:
                     "token": item.token,
                     "path": item.path,
                     "preview": list(item.preview),
-                    "search_text": item.search_text,
                 }
                 for item in items
             ],

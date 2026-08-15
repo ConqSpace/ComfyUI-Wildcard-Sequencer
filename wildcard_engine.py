@@ -39,7 +39,6 @@ class WildcardCatalogItem:
     token: str
     path: str
     preview: tuple[str, ...]
-    search_text: str
 
 
 class _WildcardFileCache:
@@ -215,13 +214,11 @@ def build_catalog(directory: str, *, max_items: int = 5_000) -> tuple[Path, list
 
         lines = _WildcardFileCache.read_lines(resolved_path)
         token_path = relative_path.with_suffix("").as_posix()
-        searchable_lines = " ".join(lines[:50])[:4_000]
         items.append(
             WildcardCatalogItem(
                 token=token_path,
                 path=token_path,
                 preview=tuple(lines[:3]),
-                search_text=searchable_lines,
             )
         )
         if len(items) >= max_items:

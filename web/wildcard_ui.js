@@ -353,7 +353,6 @@ function 항목_정규화(item) {
         preview: Array.isArray(item.preview)
             ? item.preview.map(문자열_정리).filter(Boolean).join(" · ")
             : 문자열_정리(item.preview),
-        searchText: 문자열_정리(item.search_text ?? item.searchText),
     };
 }
 
@@ -390,8 +389,7 @@ function 최근_쓰기(directory, item) {
 }
 
 function 검색어_포함(item, query) {
-    const 검색_대상 = `${item.token}\n${item.path}\n${item.preview}\n${item.searchText}`
-        .toLocaleLowerCase();
+    const 검색_대상 = item.token.toLocaleLowerCase();
     return query
         .toLocaleLowerCase()
         .split(/\s+/)
@@ -555,8 +553,8 @@ function 와일드카드_선택기_연결(node) {
     const search = document.createElement("input");
     search.type = "search";
     search.className = "wsq-picker__search";
-    search.placeholder = "파일명 · 경로 · 내용 검색";
-    search.setAttribute("aria-label", "와일드카드 검색");
+    search.placeholder = "토큰명 검색";
+    search.setAttribute("aria-label", "와일드카드 토큰명 검색");
     search.setAttribute("aria-controls", 결과_식별자);
 
     const refresh = document.createElement("button");
