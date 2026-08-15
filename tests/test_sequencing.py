@@ -23,7 +23,6 @@ WildcardTemplateSpec = models.WildcardTemplateSpec
 
 def make_template(name: str, count: int) -> WildcardTemplateSpec:
     return WildcardTemplateSpec(
-        name=name,
         template=f"__{name.lower()}__",
         image_count=count,
         wildcard_root="wildcards",
@@ -39,11 +38,11 @@ class WildcardTemplateSpecTests(unittest.TestCase):
 
     def test_empty_template_and_invalid_count_are_rejected(self):
         with self.assertRaises(ValueError):
-            WildcardTemplateSpec("A", "   ", 1, "wildcards")
+            WildcardTemplateSpec("   ", 1, "wildcards")
         with self.assertRaises(ValueError):
-            WildcardTemplateSpec("A", "text", 0, "wildcards")
+            WildcardTemplateSpec("text", 0, "wildcards")
         with self.assertRaises(TypeError):
-            WildcardTemplateSpec("A", "text", True, "wildcards")
+            WildcardTemplateSpec("text", True, "wildcards")
 
 
 class SequencingTests(unittest.TestCase):
@@ -55,38 +54,44 @@ class SequencingTests(unittest.TestCase):
         ]
 
     def test_quota_boundaries_and_cycle(self):
-        expected_names = {
-            0: "A",
-            49: "A",
-            50: "B",
-            99: "B",
-            100: "C",
-            149: "C",
-            150: "A",
-            199: "A",
+        expected_templates = {
+            0: "__a__",
+            49: "__a__",
+            50: "__b__",
+            99: "__b__",
+            100: "__c__",
+            149: "__c__",
+            150: "__a__",
+            199: "__a__",
         }
 
-        for image_index, expected_name in expected_names.items():
+        for image_index, expected_template in expected_templates.items():
             with self.subTest(image_index=image_index):
                 selected = sequencing.select_template(self.templates, image_index)
-                self.assertEqual(selected.name, expected_name)
+                self.assertEqual(selected.template, expected_template)
 
     def test_two_hundred_images_allocate_expected_counts(self):
-        names = [
-            sequencing.select_template(self.templates, image_index).name
+        selected_templates = [
+            sequencing.select_template(self.templates, image_index).template
             for image_index in range(200)
         ]
 
-        self.assertEqual(names.count("A"), 100)
-        self.assertEqual(names.count("B"), 50)
-        self.assertEqual(names.count("C"), 50)
+        self.assertEqual(selected_templates.count("__a__"), 100)
+        self.assertEqual(selected_templates.count("__b__"), 50)
+        self.assertEqual(selected_templates.count("__c__"), 50)
 
     def test_disconnected_middle_template_is_naturally_compressed(self):
         remaining_templates = [self.templates[0], self.templates[2]]
 
-        self.assertEqual(sequencing.select_template(remaining_templates, 49).name, "A")
-        self.assertEqual(sequencing.select_template(remaining_templates, 50).name, "C")
-        self.assertEqual(sequencing.select_template(remaining_templates, 100).name, "A")
+        self.assertEqual(
+            sequencing.select_template(remaining_templates, 49).template, "__a__"
+        )
+        self.assertEqual(
+            sequencing.select_template(remaining_templates, 50).template, "__c__"
+        )
+        self.assertEqual(
+            sequencing.select_template(remaining_templates, 100).template, "__a__"
+        )
 
     def test_empty_templates_and_negative_index_are_rejected(self):
         with self.assertRaises(ValueError):

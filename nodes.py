@@ -27,7 +27,7 @@ class WildcardTemplateNode(io.ComfyNode):
                 ),
                 io.String.Input(
                     "template",
-                    display_name="프롬프트 템플릿",
+                    display_name="프롬프트",
                     default="portrait of __characters__",
                     multiline=True,
                 ),
@@ -63,8 +63,9 @@ class WildcardTemplateNode(io.ComfyNode):
         if not wildcard_root.is_dir():
             raise FileNotFoundError(f"와일드카드 폴더가 없습니다: {wildcard_root}")
 
+        # 초기 워크플로와 API 입력 형식을 유지하되 사용자에게는 숨기는 호환 필드입니다.
+        _ = template_name
         specification = WildcardTemplateSpec(
-            name=template_name.strip(),
             template=template,
             image_count=image_count,
             wildcard_root=str(wildcard_root),

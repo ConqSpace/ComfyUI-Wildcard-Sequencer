@@ -6,6 +6,7 @@ import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -104,15 +105,19 @@ class WildcardEngineTests(unittest.TestCase):
                 "__a__", ScriptedChoiceSource([0, 0])
             )
 
-    def test_catalog_uses_relative_tokens_and_previews(self):
+    def test_catalog_uses_relative_tokens_without_reading_contents(self):
         self.write_wildcard("style/lighting.txt", "rim light\nsoft light\n")
 
-        root, items = engine.build_catalog(str(self.root))
+        with mock.patch.object(
+            engine._WildcardFileCache,
+            "read_lines",
+            side_effect=AssertionError("카탈로그는 파일 내용을 읽지 않아야 합니다."),
+        ):
+            root, items = engine.build_catalog(str(self.root))
 
         self.assertEqual(root, self.root.resolve())
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0].token, "style/lighting")
-        self.assertEqual(items[0].preview, ("rim light", "soft light"))
 
     def test_catalog_accepts_uppercase_txt_suffix(self):
         self.write_wildcard("style/CAMERA.TXT", "close-up\n")

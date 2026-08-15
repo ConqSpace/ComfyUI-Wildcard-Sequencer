@@ -3,12 +3,10 @@ import { api } from "../../scripts/api.js";
 
 const 템플릿_노드 = "WSQ_WildcardTemplate";
 const 시퀀서_노드 = "WSQ_WildcardSequencer";
-const 최근_저장소_키 = "wsq.wildcard-picker.recent.v1";
-const 최근_최대_개수 = 8;
 const 검색_최대_개수 = 40;
 const 검색기_열림_속성 = "wsq_picker_expanded";
 const 검색기_접힌_높이 = 40;
-const 검색기_펼친_높이 = 238;
+const 검색기_펼친_높이 = 200;
 let 선택기_일련번호 = 0;
 
 function 세션_식별자_만들기() {
@@ -98,13 +96,24 @@ function 시퀀서_직렬화_연결(node) {
     const queueIndexWidget = node.widgets?.find(
         (widget) => widget.name === "queue_index",
     );
+    const imagesPerExecutionWidget = node.widgets?.find(
+        (widget) => widget.name === "images_per_execution",
+    );
 
-    if (!queueGroupWidget || !queueIndexWidget) {
+    if (!queueGroupWidget || !queueIndexWidget || !imagesPerExecutionWidget) {
         console.warn(
-            "[Wildcard Sequencer] queue_group 또는 queue_index 위젯을 찾지 못했습니다.",
+            "[Wildcard Sequencer] 내부 실행 위젯을 찾지 못했습니다.",
         );
         return;
     }
+
+    /*
+     * 세 값은 프롬프트 직렬화에는 필요하지만 사용자가 편집할 값은 아니다.
+     * ComfyUI는 숨긴 위젯에도 beforeQueued를 호출하므로 화면에서만 제외한다.
+     */
+    queueGroupWidget.hidden = true;
+    queueIndexWidget.hidden = true;
+    imagesPerExecutionWidget.hidden = true;
 
     const 기존_호출 = queueGroupWidget.beforeQueued;
     queueGroupWidget.beforeQueued = function () {
@@ -118,6 +127,14 @@ function 시퀀서_직렬화_연결(node) {
         queueGroupWidget.value = 값.queueGroup;
         queueIndexWidget.value = 값.queueIndex;
     };
+
+    requestAnimationFrame(() => {
+        const 계산_크기 = node.computeSize?.() ?? node.size;
+        node.setSize?.([
+            node.size?.[0] ?? 계산_크기?.[0] ?? 0,
+            계산_크기?.[1] ?? node.size?.[1] ?? 0,
+        ]);
+    });
 }
 
 function 스타일_설치() {
@@ -152,7 +169,7 @@ function 스타일_설치() {
         .wsq-picker__toggle {
             box-sizing: border-box;
             display: grid;
-            grid-template-columns: 16px minmax(0, 1fr) auto;
+            grid-template-columns: 16px minmax(0, 1fr);
             align-items: center;
             gap: 5px;
             width: 100%;
@@ -176,7 +193,6 @@ function 스타일_설치() {
 
         .wsq-picker__toggle:focus-visible,
         .wsq-picker__search:focus-visible,
-        .wsq-picker__refresh:focus-visible,
         .wsq-picker__item:focus-visible {
             outline: 2px solid var(--p-primary-color, #6da7ff);
             outline-offset: 1px;
@@ -194,17 +210,6 @@ function 스타일_설치() {
             white-space: nowrap;
         }
 
-        .wsq-picker__count {
-            color: var(--descrip-text, #aaa);
-            font-size: 11px;
-            font-variant-numeric: tabular-nums;
-            white-space: nowrap;
-        }
-
-        .wsq-picker__count[data-kind="error"] {
-            color: var(--error-text, #ff8989);
-        }
-
         .wsq-picker__content {
             display: flex;
             flex: 1 1 auto;
@@ -218,14 +223,9 @@ function 스타일_설치() {
             display: none;
         }
 
-        .wsq-picker__search-row {
-            display: flex;
-            gap: 5px;
-        }
-
-        .wsq-picker__search,
-        .wsq-picker__refresh {
+        .wsq-picker__search {
             box-sizing: border-box;
+            width: 100%;
             min-height: 29px;
             color: var(--input-text, var(--fg-color, #eee));
             background: var(--comfy-input-bg, #151515);
@@ -240,24 +240,6 @@ function 스타일_설치() {
             outline: none;
         }
 
-        .wsq-picker__refresh {
-            flex: 0 0 30px;
-            padding: 0;
-            cursor: pointer;
-        }
-
-        .wsq-picker__status {
-            min-height: 17px;
-            overflow: hidden;
-            color: var(--descrip-text, #aaa);
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .wsq-picker__status[data-kind="error"] {
-            color: var(--error-text, #ff8989);
-        }
-
         .wsq-picker__results {
             flex: 1 1 auto;
             min-height: 0;
@@ -266,25 +248,10 @@ function 스타일_설치() {
             scrollbar-width: thin;
         }
 
-        .wsq-picker__heading {
-            position: sticky;
-            top: 0;
-            z-index: 1;
-            padding: 5px 4px 3px;
-            color: var(--descrip-text, #aaa);
-            background: var(--comfy-menu-bg, #202020);
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-        }
-
         .wsq-picker__item {
-            display: grid;
-            grid-template-columns: minmax(86px, .8fr) minmax(0, 1.2fr);
-            gap: 4px 8px;
+            display: block;
             width: 100%;
-            padding: 5px 6px;
+            padding: 6px;
             color: inherit;
             text-align: left;
             background: transparent;
@@ -298,10 +265,9 @@ function 스타일_설치() {
             background: var(--comfy-input-bg, #303030);
         }
 
-        .wsq-picker__token,
-        .wsq-picker__path,
-        .wsq-picker__preview {
+        .wsq-picker__token {
             overflow: hidden;
+            display: block;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
@@ -310,18 +276,6 @@ function 스타일_설치() {
             color: var(--p-primary-color, #8bb7ff);
             font-family: ui-monospace, Consolas, monospace;
             font-weight: 700;
-        }
-
-        .wsq-picker__path {
-            color: var(--descrip-text, #aaa);
-            text-align: right;
-        }
-
-        .wsq-picker__preview {
-            grid-column: 1 / -1;
-            color: var(--fg-color, #ddd);
-            opacity: .82;
-            font-size: 11px;
         }
 
         .wsq-picker__message {
@@ -349,43 +303,7 @@ function 항목_정규화(item) {
 
     return {
         token,
-        path: 문자열_정리(item.path),
-        preview: Array.isArray(item.preview)
-            ? item.preview.map(문자열_정리).filter(Boolean).join(" · ")
-            : 문자열_정리(item.preview),
     };
-}
-
-function 최근_전체_읽기() {
-    try {
-        const 값 = JSON.parse(localStorage.getItem(최근_저장소_키) ?? "{}");
-        return 값 && typeof 값 === "object" && !Array.isArray(값) ? 값 : {};
-    } catch {
-        return {};
-    }
-}
-
-function 최근_읽기(directory) {
-    const 저장값 = 최근_전체_읽기()[directory];
-    if (!Array.isArray(저장값)) {
-        return [];
-    }
-
-    return 저장값.map(항목_정규화).filter(Boolean).slice(0, 최근_최대_개수);
-}
-
-function 최근_쓰기(directory, item) {
-    try {
-        const 전체 = 최근_전체_읽기();
-        const 기존 = Array.isArray(전체[directory]) ? 전체[directory] : [];
-        전체[directory] = [
-            item,
-            ...기존.filter((후보) => 후보?.token !== item.token),
-        ].slice(0, 최근_최대_개수);
-        localStorage.setItem(최근_저장소_키, JSON.stringify(전체));
-    } catch {
-        // 저장 공간이 막혀 있어도 선택 기능 자체는 계속 동작해야 한다.
-    }
 }
 
 function 검색어_포함(item, query) {
@@ -461,36 +379,17 @@ function 결과_버튼_만들기(item, 삽입) {
     button.className = "wsq-picker__item";
     button.setAttribute("role", "option");
     button.setAttribute("aria-label", `${item.token} 와일드카드 삽입`);
-    button.title = item.path || item.token;
 
     const token = document.createElement("span");
     token.className = "wsq-picker__token";
     token.textContent = `__${item.token}__`;
 
-    const path = document.createElement("span");
-    path.className = "wsq-picker__path";
-    path.textContent = item.path;
-
-    button.append(token, path);
-
-    if (item.preview) {
-        const preview = document.createElement("span");
-        preview.className = "wsq-picker__preview";
-        preview.textContent = item.preview;
-        button.append(preview);
-    }
+    button.append(token);
 
     // 검색 결과를 눌러도 템플릿 편집기의 마지막 커서 위치를 잃지 않는다.
     button.addEventListener("pointerdown", (event) => event.preventDefault());
     button.addEventListener("click", () => 삽입(item));
     return button;
-}
-
-function 제목_추가(container, text) {
-    const heading = document.createElement("div");
-    heading.className = "wsq-picker__heading";
-    heading.textContent = text;
-    container.append(heading);
 }
 
 function 메시지_표시(container, text) {
@@ -501,6 +400,9 @@ function 메시지_표시(container, text) {
 }
 
 function 와일드카드_선택기_연결(node) {
+    const templateNameWidget = node.widgets?.find(
+        (widget) => widget.name === "template_name",
+    );
     const templateWidget = node.widgets?.find(
         (widget) => widget.name === "template",
     );
@@ -508,12 +410,15 @@ function 와일드카드_선택기_연결(node) {
         (widget) => widget.name === "wildcard_directory",
     );
 
-    if (!templateWidget || !directoryWidget) {
+    if (!templateNameWidget || !templateWidget || !directoryWidget) {
         console.warn(
-            "[Wildcard Sequencer] template 또는 wildcard_directory 위젯을 찾지 못했습니다.",
+            "[Wildcard Sequencer] Template 입력 위젯을 찾지 못했습니다.",
         );
         return;
     }
+
+    // 초기 버전과 저장 형식은 호환하면서 효과 없는 이름 입력만 화면에서 감춘다.
+    templateNameWidget.hidden = true;
 
     스타일_설치();
     선택기_일련번호 += 1;
@@ -535,20 +440,13 @@ function 와일드카드_선택기_연결(node) {
 
     const toggleLabel = document.createElement("span");
     toggleLabel.className = "wsq-picker__toggle-label";
-    toggleLabel.textContent = "와일드카드 검색";
+    toggleLabel.textContent = "토큰 찾기";
 
-    const itemCount = document.createElement("span");
-    itemCount.className = "wsq-picker__count";
-    itemCount.textContent = "…";
-
-    toggle.append(chevron, toggleLabel, itemCount);
+    toggle.append(chevron, toggleLabel);
 
     const content = document.createElement("div");
     content.id = 내용_식별자;
     content.className = "wsq-picker__content";
-
-    const searchRow = document.createElement("div");
-    searchRow.className = "wsq-picker__search-row";
 
     const search = document.createElement("input");
     search.type = "search";
@@ -557,27 +455,14 @@ function 와일드카드_선택기_연결(node) {
     search.setAttribute("aria-label", "와일드카드 토큰명 검색");
     search.setAttribute("aria-controls", 결과_식별자);
 
-    const refresh = document.createElement("button");
-    refresh.type = "button";
-    refresh.className = "wsq-picker__refresh";
-    refresh.textContent = "↻";
-    refresh.title = "와일드카드 목록 새로고침";
-    refresh.setAttribute("aria-label", "와일드카드 목록 새로고침");
-
-    searchRow.append(search, refresh);
-
-    const status = document.createElement("div");
-    status.className = "wsq-picker__status";
-    status.setAttribute("role", "status");
-    status.setAttribute("aria-live", "polite");
-
     const results = document.createElement("div");
     results.id = 결과_식별자;
     results.className = "wsq-picker__results";
     results.setAttribute("role", "listbox");
     results.setAttribute("aria-label", "와일드카드 검색 결과");
+    results.setAttribute("aria-live", "polite");
 
-    content.append(searchRow, status, results);
+    content.append(search, results);
     root.append(toggle, content);
 
     const 커서 = 템플릿_선택_추적(templateWidget);
@@ -593,7 +478,7 @@ function 와일드카드_선택기_연결(node) {
         requestAnimationFrame(() => {
             const 계산_크기 = node.computeSize?.() ?? node.size;
             node.setSize?.([
-                Math.max(node.size?.[0] ?? 0, 340),
+                Math.max(node.size?.[0] ?? 0, 300),
                 계산_크기?.[1] ?? node.size?.[1] ?? 0,
             ]);
             node.setDirtyCanvas?.(true, true);
@@ -620,35 +505,21 @@ function 와일드카드_선택기_연결(node) {
         }
     };
 
-    const 헤더_상태_표시 = (text, kind) => {
-        itemCount.textContent = text;
-        itemCount.dataset.kind = kind;
-    };
-
     const 선택_삽입 = (item) => {
         와일드카드_삽입(templateWidget, item, node, 커서.상태);
-        최근_쓰기(현재_디렉터리, item);
         그리기();
     };
 
     const 그리기 = () => {
         if (불러오는_중) {
-            헤더_상태_표시("불러오는 중", "loading");
-            status.dataset.kind = "loading";
-            status.textContent = "와일드카드를 불러오는 중…";
             메시지_표시(results, "목록을 불러오는 중입니다.");
             return;
         }
 
         if (오류) {
-            헤더_상태_표시("오류", "error");
-            status.dataset.kind = "error";
-            status.textContent = 오류;
-            메시지_표시(results, "목록을 불러오지 못했습니다.");
+            메시지_표시(results, 오류);
             return;
         }
-
-        헤더_상태_표시(`${항목들.length}개`, "ready");
 
         const query = search.value.trim();
         const 검색_결과 = (query
@@ -656,24 +527,7 @@ function 와일드카드_선택기_연결(node) {
             : 항목들
         ).slice(0, 검색_최대_개수);
 
-        status.dataset.kind = "ready";
-        status.textContent = query
-            ? `${검색_결과.length}개 표시 · 전체 ${항목들.length}개`
-            : `전체 ${항목들.length}개 · Enter로 첫 결과 삽입`;
         results.replaceChildren();
-
-        if (!query) {
-            const 현재_토큰 = new Set(항목들.map((item) => item.token));
-            const 최근 = 최근_읽기(현재_디렉터리).filter((item) =>
-                현재_토큰.has(item.token),
-            );
-            if (최근.length) {
-                제목_추가(results, "최근 사용");
-                for (const item of 최근) {
-                    results.append(결과_버튼_만들기(item, 선택_삽입));
-                }
-            }
-        }
 
         if (!검색_결과.length) {
             const message = document.createElement("div");
@@ -685,7 +539,6 @@ function 와일드카드_선택기_연결(node) {
             return;
         }
 
-        제목_추가(results, query ? "검색 결과" : "전체 목록");
         for (const item of 검색_결과) {
             results.append(결과_버튼_만들기(item, 선택_삽입));
         }
@@ -761,13 +614,18 @@ function 와일드카드_선택기_연결(node) {
     toggle.addEventListener("click", () => {
         const 다음_펼침 = !펼침;
         펼침_적용(다음_펼침, true, 다음_펼침);
+        if (다음_펼침) {
+            목록_불러오기(true);
+        }
     });
-    refresh.addEventListener("click", () => 목록_불러오기(true));
 
     const 기존_디렉터리_호출 = directoryWidget.callback;
     let 디렉터리_타이머 = 0;
     directoryWidget.callback = function () {
         const 반환값 = 기존_디렉터리_호출?.apply(this, arguments);
+        if (!펼침) {
+            return 반환값;
+        }
         clearTimeout(디렉터리_타이머);
         디렉터리_타이머 = setTimeout(() => 목록_불러오기(true), 180);
         return 반환값;
@@ -787,6 +645,9 @@ function 와일드카드_선택기_연결(node) {
         const 반환값 = 기존_구성?.apply(this, arguments);
         const 저장된_펼침 = 정보?.properties?.[검색기_열림_속성] === true;
         펼침_적용(저장된_펼침);
+        if (저장된_펼침) {
+            목록_불러오기(true);
+        }
         return 반환값;
     };
 
@@ -799,7 +660,9 @@ function 와일드카드_선택기_연결(node) {
     };
 
     펼침_적용(node.properties?.[검색기_열림_속성] === true);
-    목록_불러오기(true);
+    if (펼침) {
+        목록_불러오기(true);
+    }
 }
 
 app.registerExtension({

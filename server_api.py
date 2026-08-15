@@ -10,20 +10,12 @@ from .wildcard_engine import build_catalog
 async def get_wildcard_catalog(request: web.Request) -> web.Response:
     directory = request.query.get("root", "wildcards")
     try:
-        root, items = build_catalog(directory)
+        _root, items = build_catalog(directory)
     except (OSError, ValueError) as error:
         return web.json_response({"error": str(error), "items": []}, status=400)
 
     return web.json_response(
         {
-            "root": str(root),
-            "items": [
-                {
-                    "token": item.token,
-                    "path": item.path,
-                    "preview": list(item.preview),
-                }
-                for item in items
-            ],
+            "items": [{"token": item.token} for item in items],
         }
     )
