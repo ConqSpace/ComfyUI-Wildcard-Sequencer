@@ -3,7 +3,7 @@ import { api } from "../../scripts/api.js";
 
 const 검색_최대_개수 = 40;
 const 최대_템플릿_개수 = 256;
-const 매니저_높이 = 350;
+const 매니저_최소_높이 = 350;
 const 검색기_열림_속성 = "wsq_manager_picker_expanded";
 
 let 행_일련번호 = 0;
@@ -107,7 +107,8 @@ function 스타일_설치() {
             gap: 7px;
             width: 100%;
             min-width: 390px;
-            height: ${매니저_높이}px;
+            height: 100%;
+            min-height: ${매니저_최소_높이}px;
             padding: 7px;
             overflow: hidden;
             color: var(--fg-color, #ddd);
@@ -233,7 +234,10 @@ function 스타일_설치() {
         }
 
         .wsq-manager__finder {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
             min-height: 29px;
+            overflow: hidden;
             border-top: 1px solid var(--border-color, #444);
         }
 
@@ -258,7 +262,7 @@ function 스타일_설치() {
             display: grid;
             grid-template-rows: auto minmax(0, 1fr);
             gap: 5px;
-            height: 126px;
+            min-height: 0;
             padding-top: 4px;
         }
 
@@ -657,7 +661,7 @@ export function 템플릿_관리자_연결(node) {
         toggle.setAttribute("aria-expanded", String(expanded));
         chevron.textContent = expanded ? "▾" : "▸";
         root.style.gridTemplateRows = expanded
-            ? "auto minmax(94px, 1fr) 160px"
+            ? "auto minmax(94px, 3fr) minmax(160px, 2fr)"
             : "auto minmax(94px, 1fr) auto";
         if (saveState) {
             node.properties ??= {};
@@ -723,8 +727,8 @@ export function 템플릿_관리자_연결(node) {
     node.addDOMWidget("template_manager", "WSQ_TEMPLATE_MANAGER", root, {
         serialize: false,
         hideOnZoom: true,
-        getMinHeight: () => 매니저_높이,
-        getHeight: () => 매니저_높이,
+        // 최대 높이를 지정하지 않아 노드 세로 리사이즈의 남는 공간을 모두 받습니다.
+        getMinHeight: () => 매니저_최소_높이,
     });
 
     const originalConfigure = node.onConfigure;
@@ -762,6 +766,9 @@ export function 템플릿_관리자_연결(node) {
     requestAnimationFrame(() => {
         const width = Math.max(node.size?.[0] ?? 0, 430);
         const computed = node.computeSize?.() ?? node.size;
-        node.setSize?.([width, computed?.[1] ?? node.size?.[1] ?? 매니저_높이]);
+        node.setSize?.([
+            width,
+            computed?.[1] ?? node.size?.[1] ?? 매니저_최소_높이,
+        ]);
     });
 }
