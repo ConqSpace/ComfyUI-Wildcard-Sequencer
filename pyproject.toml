@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-wildcard-sequencer"
-version = "0.2.1"
+version = "0.3.0"
 description = "다중 와일드카드 템플릿 매니저와 이미지 수량 기반 순차 프롬프트 노드"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -39,6 +39,64 @@ class WildcardCatalogItem:
     token: str
 
 
+@dataclass(frozen=True, slots=True)
+class _InlineChoice:
+    start: int
+    end: int
+    alternatives: tuple[str, ...]
+
+
+def _find_inline_choice(
+    text: str,
+    start: int = 0,
+    end: int | None = None,
+) -> _InlineChoice | None:
+    """가장 왼쪽의 완성된 선택식을 찾되 바깥 선택식을 우선합니다."""
+
+    limit = len(text) if end is None else min(end, len(text))
+    search_position = start
+
+    while search_position < limit:
+        opening = text.find("{", search_position, limit)
+        if opening < 0:
+            return None
+
+        depth = 0
+        separators: list[int] = []
+        closing: int | None = None
+        for position in range(opening, limit):
+            character = text[position]
+            if character == "{":
+                depth += 1
+            elif character == "}":
+                depth -= 1
+                if depth == 0:
+                    closing = position
+                    break
+            elif character == "|" and depth == 1:
+                separators.append(position)
+
+        if closing is None:
+            # 닫히지 않은 바깥 중괄호 안에 정상 선택식이 있을 수도 있습니다.
+            search_position = opening + 1
+            continue
+
+        if separators:
+            boundaries = [opening, *separators, closing]
+            alternatives = tuple(
+                text[boundaries[index] + 1 : boundaries[index + 1]]
+                for index in range(len(boundaries) - 1)
+            )
+            return _InlineChoice(opening, closing + 1, alternatives)
+
+        nested = _find_inline_choice(text, opening + 1, closing)
+        if nested is not None:
+            return nested
+        search_position = closing + 1
+
+    return None
+
+
 class _WildcardFileCache:
     """야간 대량 큐에서 같은 텍스트 파일을 매번 다시 읽지 않도록 합니다."""
 
@@ -157,42 +215,82 @@ class WildcardExpander:
     ) -> str:
         if depth > self.max_depth:
             raise WildcardRecursionError(
-                f"와일드카드 중첩 깊이가 {self.max_depth}단계를 초과했습니다."
+                f"프롬프트 중첩 깊이가 {self.max_depth}단계를 초과했습니다."
             )
 
-        def replace(match: re.Match[str]) -> str:
-            token = match.group(1).strip()
+        result: list[str] = []
+        position = 0
+        while position < len(text):
+            token_match = TOKEN_PATTERN.search(text, position)
+            inline_choice = _find_inline_choice(text, position)
+
+            use_inline_choice = inline_choice is not None and (
+                token_match is None or inline_choice.start < token_match.start()
+            )
+            if use_inline_choice:
+                assert inline_choice is not None
+                result.append(text[position : inline_choice.start])
+                self._count_replacement(replacement_count)
+                selected = rng.choice(list(inline_choice.alternatives))
+                result.append(
+                    self._expand_text(
+                        selected,
+                        rng,
+                        token_stack,
+                        depth + 1,
+                        replacement_count,
+                    )
+                )
+                position = inline_choice.end
+                continue
+
+            if token_match is None:
+                result.append(text[position:])
+                break
+
+            result.append(text[position : token_match.start()])
+            token = token_match.group(1).strip()
             normalized_token = token.replace("\\", "/").removesuffix(".txt")
             if normalized_token in token_stack:
                 chain = " -> ".join((*token_stack, normalized_token))
                 raise WildcardRecursionError(f"와일드카드 순환 참조를 발견했습니다: {chain}")
 
-            replacement_count[0] += 1
-            if replacement_count[0] > self.max_replacements:
-                raise WildcardRecursionError(
-                    f"와일드카드 치환 수가 {self.max_replacements}개를 초과했습니다."
-                )
+            self._count_replacement(replacement_count)
 
             wildcard_path = resolve_token_path(self.root, token)
             if not wildcard_path.is_file():
                 LOGGER.warning("와일드카드 파일이 없어 원문을 유지합니다: %s", wildcard_path)
-                return match.group(0)
+                result.append(token_match.group(0))
+                position = token_match.end()
+                continue
 
             choices = _WildcardFileCache.read_lines(wildcard_path)
             if not choices:
                 LOGGER.warning("사용 가능한 항목이 없어 원문을 유지합니다: %s", wildcard_path)
-                return match.group(0)
+                result.append(token_match.group(0))
+                position = token_match.end()
+                continue
 
             selected = rng.choice(choices)
-            return self._expand_text(
-                selected,
-                rng,
-                (*token_stack, normalized_token),
-                depth + 1,
-                replacement_count,
+            result.append(
+                self._expand_text(
+                    selected,
+                    rng,
+                    (*token_stack, normalized_token),
+                    depth + 1,
+                    replacement_count,
+                )
             )
+            position = token_match.end()
 
-        return TOKEN_PATTERN.sub(replace, text)
+        return "".join(result)
+
+    def _count_replacement(self, replacement_count: list[int]) -> None:
+        replacement_count[0] += 1
+        if replacement_count[0] > self.max_replacements:
+            raise WildcardRecursionError(
+                f"프롬프트 치환 수가 {self.max_replacements}개를 초과했습니다."
+            )
 
 
 def build_catalog(directory: str, *, max_items: int = 5_000) -> tuple[Path, list[WildcardCatalogItem]]:

@@ -66,6 +66,75 @@ class WildcardEngineTests(unittest.TestCase):
         self.assertEqual(result, "cat and dog")
         self.assertEqual(choice_source.call_count, 2)
 
+    def test_inline_choices_are_selected_independently(self):
+        choice_source = ScriptedChoiceSource([1, 0])
+
+        result = engine.WildcardExpander(self.root).expand(
+            "{red|blue} {shirt|coat}", choice_source
+        )
+
+        self.assertEqual(result, "blue shirt")
+        self.assertEqual(choice_source.call_count, 2)
+
+    def test_unselected_nested_choice_does_not_consume_random_value(self):
+        choice_source = ScriptedChoiceSource([0])
+
+        result = engine.WildcardExpander(self.root).expand(
+            "{plain|{red|blue}} portrait", choice_source
+        )
+
+        self.assertEqual(result, "plain portrait")
+        self.assertEqual(choice_source.call_count, 1)
+
+    def test_selected_nested_choice_is_expanded(self):
+        choice_source = ScriptedChoiceSource([1, 1])
+
+        result = engine.WildcardExpander(self.root).expand(
+            "{plain|{red|blue}} portrait", choice_source
+        )
+
+        self.assertEqual(result, "blue portrait")
+
+    def test_inline_choices_and_wildcards_follow_text_order(self):
+        self.write_wildcard("subjects.txt", "cat\ndog\n")
+        choice_source = ScriptedChoiceSource([1, 0])
+
+        result = engine.WildcardExpander(self.root).expand(
+            "__subjects__ in {forest|city}", choice_source
+        )
+
+        self.assertEqual(result, "dog in forest")
+
+    def test_choices_can_contain_wildcards_and_wildcards_can_contain_choices(self):
+        self.write_wildcard("mood.txt", "{calm|angry}\n")
+
+        wildcard_in_choice = engine.WildcardExpander(self.root).expand(
+            "{plain|__mood__} portrait", ScriptedChoiceSource([1, 0, 1])
+        )
+        choice_in_wildcard = engine.WildcardExpander(self.root).expand(
+            "__mood__ portrait", ScriptedChoiceSource([0, 1])
+        )
+
+        self.assertEqual(wildcard_in_choice, "angry portrait")
+        self.assertEqual(choice_in_wildcard, "angry portrait")
+
+    def test_non_choice_and_unclosed_braces_are_preserved(self):
+        result = engine.WildcardExpander(self.root).expand(
+            "{literal} and {unclosed"
+        )
+
+        self.assertEqual(result, "{literal} and {unclosed")
+
+    def test_inline_choice_respects_depth_and_replacement_limits(self):
+        with self.assertRaises(engine.WildcardRecursionError):
+            engine.WildcardExpander(self.root, max_depth=1).expand(
+                "{a|{b|c}}", ScriptedChoiceSource([1, 0])
+            )
+        with self.assertRaises(engine.WildcardRecursionError):
+            engine.WildcardExpander(self.root, max_replacements=1).expand(
+                "{a|b} {c|d}", ScriptedChoiceSource([0, 0])
+            )
+
     def test_nested_subfolder_wildcard_is_expanded(self):
         self.write_wildcard("characters.txt", "__styles/lighting__ knight\n")
         self.write_wildcard("styles/lighting.txt", "rim-lit\n")

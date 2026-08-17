@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
 import { 템플릿_관리자_연결 } from "./template_manager_ui.js";
 
 const 템플릿_노드 = "WSQ_WildcardTemplate";
@@ -368,14 +369,16 @@ function 템플릿_선택_추적(templateWidget) {
 
 function 와일드카드_삽입(templateWidget, item, node, 선택) {
     const 원문 = String(templateWidget.value ?? "");
-    const 시작 = Math.min(선택.시작, 원문.length);
-    const 끝 = Math.min(Math.max(선택.끝, 시작), 원문.length);
-    const token = `__${item.token}__`;
-    const 새_값 = `${원문.slice(0, 시작)}${token}${원문.slice(끝)}`;
+    const insertion = 와일드카드_토큰_삽입(
+        원문,
+        선택.시작,
+        선택.끝,
+        item.token,
+    );
 
-    선택.시작 = 시작 + token.length;
-    선택.끝 = 선택.시작;
-    위젯_값_알리기(templateWidget, 새_값, node);
+    선택.시작 = insertion.cursor;
+    선택.끝 = insertion.cursor;
+    위젯_값_알리기(templateWidget, insertion.value, node);
 }
 
 function 결과_버튼_만들기(item, 삽입) {

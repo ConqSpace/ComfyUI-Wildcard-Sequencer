@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
 
 const 검색_최대_개수 = 40;
 const 최대_템플릿_개수 = 256;
@@ -600,13 +601,16 @@ export function 템플릿_관리자_연결(node) {
                 if (!row || !activePromptInput) {
                     return;
                 }
-                const token = `__${item.token}__`;
-                const start = Math.min(cursorStart, row.prompt.length);
-                const end = Math.min(Math.max(cursorEnd, start), row.prompt.length);
-                row.prompt = `${row.prompt.slice(0, start)}${token}${row.prompt.slice(end)}`;
+                const insertion = 와일드카드_토큰_삽입(
+                    row.prompt,
+                    cursorStart,
+                    cursorEnd,
+                    item.token,
+                );
+                row.prompt = insertion.value;
                 activePromptInput.value = row.prompt;
-                cursorStart = start + token.length;
-                cursorEnd = cursorStart;
+                cursorStart = insertion.cursor;
+                cursorEnd = insertion.cursor;
                 activePromptInput.focus({ preventScroll: true });
                 activePromptInput.setSelectionRange(cursorStart, cursorEnd);
                 저장();
