@@ -23,6 +23,7 @@ serialization = importlib.import_module(
 WildcardTemplateSequenceSpec = models.WildcardTemplateSequenceSpec
 MAX_TEMPLATE_COUNT = serialization.MAX_TEMPLATE_COUNT
 parse_template_rows = serialization.parse_template_rows
+apply_template_schedule = serialization.apply_template_schedule
 
 
 class TemplateSerializationTests(unittest.TestCase):
@@ -45,6 +46,10 @@ class TemplateSerializationTests(unittest.TestCase):
         )
         self.assertEqual(templates[0].wildcard_root, "C:/wildcards")
         self.assertEqual(
+            [template.template_id for template in templates],
+            ["a", "b", "c"],
+        )
+        self.assertEqual(
             WildcardTemplateSequenceSpec(templates=templates).templates,
             templates,
         )
@@ -56,6 +61,38 @@ class TemplateSerializationTests(unittest.TestCase):
         )
 
         self.assertEqual(templates[0].template, "plain prompt")
+        self.assertEqual(templates[0].template_id, "row-1")
+
+    def test_시퀀서_수량을_ID_기준으로_적용한다(self) -> None:
+        templates = parse_template_rows(
+            json.dumps(
+                [
+                    {"id": "a", "prompt": "A", "image_count": 20},
+                    {"id": "b", "prompt": "B", "image_count": 30},
+                ]
+            ),
+            "wildcards",
+        )
+
+        scheduled = apply_template_schedule(
+            templates,
+            '[{"id":"b","image_count":70},{"id":"deleted","image_count":9}]',
+        )
+
+        self.assertEqual(
+            [(template.template_id, template.image_count) for template in scheduled],
+            [("a", 20), ("b", 70)],
+        )
+
+    def test_빈_스케줄은_Manager의_기존_수량을_승계한다(self) -> None:
+        templates = parse_template_rows(
+            '[{"id":"a","prompt":"A","image_count":35}]',
+            "wildcards",
+        )
+
+        scheduled = apply_template_schedule(templates, "[]")
+
+        self.assertEqual(scheduled[0].image_count, 35)
 
     def test_잘못된_json과_배열이_아닌_값을_거부한다(self) -> None:
         for value in ("{", "{}", '"row"', "null"):
@@ -90,6 +127,43 @@ class TemplateSerializationTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_template_rows(json.dumps(rows), "wildcards")
+
+    def test_중복된_템플릿_ID와_수량_ID를_거부한다(self) -> None:
+        duplicate_templates = json.dumps(
+            [
+                {"id": "same", "prompt": "A", "image_count": 1},
+                {"id": "same", "prompt": "B", "image_count": 1},
+            ]
+        )
+        with self.assertRaises(ValueError):
+            parse_template_rows(duplicate_templates, "wildcards")
+
+        templates = parse_template_rows(
+            '[{"id":"a","prompt":"A","image_count":1}]',
+            "wildcards",
+        )
+        with self.assertRaises(ValueError):
+            apply_template_schedule(
+                templates,
+                '[{"id":"a","image_count":1},{"id":"a","image_count":2}]',
+            )
+
+    def test_잘못된_스케줄_형식을_거부한다(self) -> None:
+        templates = parse_template_rows(
+            '[{"id":"a","prompt":"A","image_count":1}]',
+            "wildcards",
+        )
+        invalid_values = (
+            "{}",
+            "{",
+            '[{"id":"","image_count":1}]',
+            '[{"id":"a","image_count":0}]',
+            '[{"id":"a","image_count":"50"}]',
+        )
+        for value in invalid_values:
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    apply_template_schedule(templates, value)
 
     def test_빈_시퀀스를_거부한다(self) -> None:
         with self.assertRaises(ValueError):

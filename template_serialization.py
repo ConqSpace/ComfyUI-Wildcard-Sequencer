@@ -19,6 +19,7 @@ DEFAULT_TEMPLATES_JSON = json.dumps(
     ensure_ascii=False,
     separators=(",", ":"),
 )
+DEFAULT_SCHEDULE_JSON = "[]"
 
 
 def parse_template_rows(
@@ -45,7 +46,13 @@ def parse_template_rows(
             raise ValueError(f"{index}번째 템플릿 형식이 올바르지 않습니다.")
 
         prompt = row.get("prompt")
+        template_id_value = row.get("id", f"row-{index}")
         image_count = row.get("image_count")
+        if not isinstance(template_id_value, str) or not template_id_value.strip():
+            raise ValueError(f"{index}번째 템플릿 ID가 올바르지 않습니다.")
+        template_id = template_id_value.strip()
+        if any(template.template_id == template_id for template in templates):
+            raise ValueError(f"중복된 템플릿 ID입니다: {template_id}")
         if not isinstance(prompt, str) or not prompt.strip():
             raise ValueError(f"{index}번째 프롬프트를 입력하세요.")
         if isinstance(image_count, bool) or not isinstance(image_count, int):
@@ -55,13 +62,59 @@ def parse_template_rows(
                 f"{index}번째 이미지 수는 1~{MAX_IMAGE_COUNT:,} 범위여야 합니다."
             )
 
-        # id는 UI의 안정적인 행 추적용일 뿐 실행 결과에는 영향을 주지 않습니다.
         templates.append(
             WildcardTemplateSpec(
                 template=prompt,
                 image_count=image_count,
                 wildcard_root=wildcard_root,
+                template_id=template_id,
             )
         )
 
     return tuple(templates)
+
+
+def apply_template_schedule(
+    templates: tuple[WildcardTemplateSpec, ...],
+    schedule_json: str,
+) -> tuple[WildcardTemplateSpec, ...]:
+    """Sequencer 수량표를 ID 기준으로 적용하고 Manager의 기존 수량은 폴백으로 둡니다."""
+
+    try:
+        rows: Any = json.loads(schedule_json)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise ValueError("Sequencer 수량 JSON이 올바르지 않습니다.") from error
+
+    if not isinstance(rows, list):
+        raise ValueError("Sequencer 수량은 배열이어야 합니다.")
+    if len(rows) > MAX_TEMPLATE_COUNT:
+        raise ValueError(f"수량 항목은 최대 {MAX_TEMPLATE_COUNT}개까지 저장할 수 있습니다.")
+
+    counts_by_id: dict[str, int] = {}
+    for index, row in enumerate(rows, start=1):
+        if not isinstance(row, dict):
+            raise ValueError(f"{index}번째 수량 항목 형식이 올바르지 않습니다.")
+        template_id = row.get("id")
+        image_count = row.get("image_count")
+        if not isinstance(template_id, str) or not template_id.strip():
+            raise ValueError(f"{index}번째 수량 항목 ID가 올바르지 않습니다.")
+        normalized_id = template_id.strip()
+        if normalized_id in counts_by_id:
+            raise ValueError(f"중복된 수량 항목 ID입니다: {normalized_id}")
+        if isinstance(image_count, bool) or not isinstance(image_count, int):
+            raise ValueError(f"{index}번째 이미지 수는 정수여야 합니다.")
+        if not 1 <= image_count <= MAX_IMAGE_COUNT:
+            raise ValueError(
+                f"{index}번째 이미지 수는 1~{MAX_IMAGE_COUNT:,} 범위여야 합니다."
+            )
+        counts_by_id[normalized_id] = image_count
+
+    return tuple(
+        WildcardTemplateSpec(
+            template=template.template,
+            image_count=counts_by_id.get(template.template_id, template.image_count),
+            wildcard_root=template.wildcard_root,
+            template_id=template.template_id,
+        )
+        for template in templates
+    )

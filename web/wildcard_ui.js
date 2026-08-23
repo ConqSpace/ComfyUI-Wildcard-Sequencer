@@ -1,12 +1,14 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
+import { 시퀀서_수량_UI_연결 } from "./sequencer_ui.js";
 import { 템플릿_관리자_연결 } from "./template_manager_ui.js";
 
 const 템플릿_노드 = "WSQ_WildcardTemplate";
 const 템플릿_관리자_노드 = "WSQ_WildcardTemplateManager";
+const 새_시퀀서_노드 = "WSQ_WildcardSequenceRunner";
 const 시퀀서_노드들 = new Set([
-    "WSQ_WildcardSequenceRunner",
+    새_시퀀서_노드,
     "WSQ_WildcardSequencer",
 ]);
 const 검색_최대_개수 = 40;
@@ -684,6 +686,9 @@ app.registerExtension({
         } else if (노드_종류 === 템플릿_노드) {
             와일드카드_선택기_연결(node);
         } else if (시퀀서_노드들.has(노드_종류)) {
+            if (노드_종류 === 새_시퀀서_노드) {
+                시퀀서_수량_UI_연결(node);
+            }
             시퀀서_직렬화_연결(node);
         }
     },

@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
+import { 폴더_와일드카드_추가 } from "./template_rows.mjs";
 
 const 검색_최대_개수 = 40;
 const 최대_템플릿_개수 = 256;
@@ -133,6 +134,8 @@ function 스타일_설치() {
         }
 
         .wsq-manager__add,
+        .wsq-manager__bulk,
+        .wsq-manager__refresh,
         .wsq-manager__toggle,
         .wsq-manager__remove,
         .wsq-manager__drag,
@@ -144,7 +147,9 @@ function 스타일_설치() {
             cursor: pointer;
         }
 
-        .wsq-manager__add {
+        .wsq-manager__add,
+        .wsq-manager__bulk,
+        .wsq-manager__refresh {
             min-height: 28px;
             padding: 4px 9px;
             background: var(--comfy-input-bg, #303030);
@@ -152,9 +157,33 @@ function 스타일_설치() {
             font-weight: 650;
         }
 
-        .wsq-manager__total {
-            color: var(--descrip-text, #aaa);
-            white-space: nowrap;
+        .wsq-manager__actions {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .wsq-manager__refresh {
+            width: 30px;
+            padding: 4px;
+        }
+
+        .wsq-manager__bulk:disabled,
+        .wsq-manager__refresh:disabled {
+            opacity: .45;
+            cursor: wait;
+        }
+
+        .wsq-manager__add:hover,
+        .wsq-manager__bulk:hover:not(:disabled),
+        .wsq-manager__refresh:hover:not(:disabled) {
+            background: color-mix(in srgb, var(--p-primary-color, #6da7ff) 14%, var(--comfy-input-bg, #303030));
+        }
+
+        .wsq-manager__add:active,
+        .wsq-manager__bulk:active:not(:disabled),
+        .wsq-manager__refresh:active:not(:disabled) {
+            transform: scale(.97);
         }
 
         .wsq-manager__rows {
@@ -165,7 +194,7 @@ function 스타일_설치() {
 
         .wsq-manager__row {
             display: grid;
-            grid-template-columns: 24px 62px minmax(0, 1fr) 24px;
+            grid-template-columns: 24px minmax(0, 1fr) 24px;
             align-items: stretch;
             gap: 5px;
             padding: 4px;
@@ -211,7 +240,6 @@ function 스타일_설치() {
             cursor: default;
         }
 
-        .wsq-manager__count,
         .wsq-manager__prompt,
         .wsq-manager__search {
             box-sizing: border-box;
@@ -221,11 +249,6 @@ function 스타일_설치() {
             border: 1px solid var(--border-color, #555);
             border-radius: 4px;
             outline: none;
-        }
-
-        .wsq-manager__count {
-            padding: 4px;
-            text-align: right;
         }
 
         .wsq-manager__prompt {
@@ -346,9 +369,21 @@ export function 템플릿_관리자_연결(node) {
     addButton.className = "wsq-manager__add";
     addButton.textContent = "+ 템플릿";
 
-    const total = document.createElement("span");
-    total.className = "wsq-manager__total";
-    toolbar.append(addButton, total);
+    const actions = document.createElement("div");
+    actions.className = "wsq-manager__actions";
+    const bulkButton = document.createElement("button");
+    bulkButton.type = "button";
+    bulkButton.className = "wsq-manager__bulk";
+    bulkButton.textContent = "전체 추가";
+    bulkButton.title = "폴더와 하위 폴더의 와일드카드를 템플릿으로 추가";
+    const refreshButton = document.createElement("button");
+    refreshButton.type = "button";
+    refreshButton.className = "wsq-manager__refresh";
+    refreshButton.textContent = "↻";
+    refreshButton.title = "와일드카드 목록 새로고침";
+    refreshButton.setAttribute("aria-label", "와일드카드 목록 새로고침");
+    actions.append(bulkButton, refreshButton);
+    toolbar.append(addButton, actions);
 
     const rowsContainer = document.createElement("div");
     rowsContainer.className = "wsq-manager__rows";
@@ -402,14 +437,25 @@ export function 템플릿_관리자_연결(node) {
     let expanded = false;
     let searchFrame = 0;
     let directoryTimer = 0;
+    let actionTimer = 0;
+    const rowListeners = new Set();
+
+    const 행_알림 = () => {
+        const snapshot = rows.map((row) => ({ ...row }));
+        for (const listener of rowListeners) {
+            listener(snapshot);
+        }
+    };
+
+    node.wsqGetTemplateRows = () => rows.map((row) => ({ ...row }));
+    node.wsqSubscribeTemplateRows = (listener) => {
+        rowListeners.add(listener);
+        return () => rowListeners.delete(listener);
+    };
 
     const 저장 = () => {
         위젯_값_저장(templatesWidget, JSON.stringify(rows), node);
-    };
-
-    const 합계_갱신 = () => {
-        const count = rows.reduce((sum, row) => sum + row.image_count, 0);
-        total.textContent = `합계 ${count.toLocaleString()}장`;
+        행_알림();
     };
 
     const 활성_행_표시 = () => {
@@ -458,15 +504,6 @@ export function 템플릿_관리자_연결(node) {
             dragHandle.title = "드래그 또는 방향키로 순서 변경";
             dragHandle.setAttribute("aria-label", "템플릿 순서 변경");
 
-            const countInput = document.createElement("input");
-            countInput.type = "number";
-            countInput.className = "wsq-manager__count";
-            countInput.min = "1";
-            countInput.max = "1000000";
-            countInput.step = "1";
-            countInput.value = String(row.image_count);
-            countInput.setAttribute("aria-label", "이미지 수");
-
             const promptInput = document.createElement("textarea");
             promptInput.className = "wsq-manager__prompt";
             promptInput.rows = 2;
@@ -495,15 +532,6 @@ export function 템플릿_관리자_연결(node) {
                 저장();
             });
 
-            countInput.addEventListener("focus", () => 행_선택(row));
-            countInput.addEventListener("change", () => {
-                row.image_count = 이미지_수_정규화(countInput.value);
-                countInput.value = String(row.image_count);
-                행_선택(row);
-                합계_갱신();
-                저장();
-            });
-
             removeButton.addEventListener("click", () => {
                 if (rows.length === 1) {
                     return;
@@ -514,7 +542,6 @@ export function 템플릿_관리자_연결(node) {
                     activeRowId = rows[Math.min(index, rows.length - 1)].id;
                 }
                 저장();
-                합계_갱신();
                 행_그리기();
             });
 
@@ -555,7 +582,7 @@ export function 템플릿_관리자_연결(node) {
                 행_그리기();
             });
 
-            rowElement.append(dragHandle, countInput, promptInput, removeButton);
+            rowElement.append(dragHandle, promptInput, removeButton);
             rowsContainer.append(rowElement);
 
             if (row.id === activeRowId) {
@@ -623,6 +650,8 @@ export function 템플릿_관리자_연결(node) {
         requestNumber += 1;
         const thisRequest = requestNumber;
         loading = true;
+        bulkButton.disabled = true;
+        refreshButton.disabled = true;
         errorMessage = "";
         검색_그리기();
 
@@ -642,18 +671,22 @@ export function 템플릿_관리자_연결(node) {
                 throw new Error("응답 형식이 올바르지 않습니다.");
             }
             if (thisRequest !== requestNumber) {
-                return;
+                return null;
             }
             items = data.items.map(항목_정규화).filter(Boolean);
+            return items;
         } catch (error) {
             if (thisRequest !== requestNumber) {
-                return;
+                return null;
             }
             items = [];
             errorMessage = `불러오기 실패: ${error instanceof Error ? error.message : String(error)}`;
+            return null;
         } finally {
             if (thisRequest === requestNumber) {
                 loading = false;
+                bulkButton.disabled = false;
+                refreshButton.disabled = false;
                 검색_그리기();
             }
         }
@@ -689,12 +722,54 @@ export function 템플릿_관리자_연결(node) {
         rows.push(row);
         activeRowId = row.id;
         저장();
-        합계_갱신();
         행_그리기();
         requestAnimationFrame(() => {
             activePromptInput?.focus({ preventScroll: true });
             rowsContainer.scrollTop = rowsContainer.scrollHeight;
         });
+    });
+    refreshButton.addEventListener("click", async () => {
+        const loadedItems = await 목록_불러오기();
+        if (loadedItems === null) {
+            return;
+        }
+        clearTimeout(actionTimer);
+        refreshButton.textContent = "✓";
+        actionTimer = setTimeout(() => {
+            refreshButton.textContent = "↻";
+        }, 1400);
+    });
+    bulkButton.addEventListener("click", async () => {
+        const loadedItems = await 목록_불러오기();
+        if (loadedItems === null) {
+            return;
+        }
+
+        const imported = 폴더_와일드카드_추가(
+            rows,
+            loadedItems,
+            새_행_식별자,
+            최대_템플릿_개수,
+        );
+        rows = imported.rows;
+        if (imported.added > 0) {
+            activeRowId = rows.at(-1).id;
+            저장();
+            행_그리기();
+            requestAnimationFrame(() => {
+                rowsContainer.scrollTop = rowsContainer.scrollHeight;
+            });
+        }
+
+        clearTimeout(actionTimer);
+        bulkButton.textContent = imported.limited > 0
+            ? `${imported.added}개 추가 · 한도 도달`
+            : imported.added > 0
+                ? `${imported.added}개 추가됨`
+                : "추가할 항목 없음";
+        actionTimer = setTimeout(() => {
+            bulkButton.textContent = "전체 추가";
+        }, 1800);
     });
     toggle.addEventListener("click", () => {
         const nextExpanded = !expanded;
@@ -742,10 +817,12 @@ export function 템플릿_관리자_연결(node) {
             const loadedRows = 행_목록_읽기(templatesWidget.value);
             rows = loadedRows.length ? loadedRows : [기본_행()];
             activeRowId = rows[0].id;
-            합계_갱신();
             행_그리기();
-            if (!loadedRows.length) {
+            const normalizedValue = JSON.stringify(rows);
+            if (!loadedRows.length || normalizedValue !== templatesWidget.value) {
                 저장();
+            } else {
+                행_알림();
             }
             const savedExpanded = info?.properties?.[검색기_열림_속성] === true;
             펼침_적용(savedExpanded);
@@ -760,11 +837,14 @@ export function 템플릿_관리자_연결(node) {
     node.onRemoved = function () {
         cancelAnimationFrame(searchFrame);
         clearTimeout(directoryTimer);
+        clearTimeout(actionTimer);
+        rowListeners.clear();
+        delete node.wsqGetTemplateRows;
+        delete node.wsqSubscribeTemplateRows;
         return originalRemoved?.apply(this, arguments);
     };
 
     저장();
-    합계_갱신();
     행_그리기();
     펼침_적용(node.properties?.[검색기_열림_속성] === true);
     requestAnimationFrame(() => {

@@ -4,7 +4,12 @@ from comfy_api.latest import io
 
 from .models import WildcardTemplateSequenceSpec, WildcardTemplateSpec
 from .sequencing import create_image_rng, select_template
-from .template_serialization import DEFAULT_TEMPLATES_JSON, parse_template_rows
+from .template_serialization import (
+    DEFAULT_SCHEDULE_JSON,
+    DEFAULT_TEMPLATES_JSON,
+    apply_template_schedule,
+    parse_template_rows,
+)
 from .wildcard_engine import WildcardExpander, resolve_wildcard_root
 
 
@@ -132,6 +137,13 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
                     display_name="templates",
                 ),
                 *_create_runtime_inputs(),
+                # 기존 워크플로의 위치 기반 widget 값을 밀지 않도록 항상 맨 뒤에 둡니다.
+                io.String.Input(
+                    "schedule_json",
+                    display_name="템플릿별 수량",
+                    default=DEFAULT_SCHEDULE_JSON,
+                    multiline=True,
+                ),
             ],
             outputs=[io.String.Output(display_name="prompt")],
             not_idempotent=True,
@@ -146,11 +158,16 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
         queue_group: str,
         queue_index: int,
         images_per_execution: int,
+        schedule_json: str,
     ) -> io.NodeOutput:
         if not isinstance(templates, WildcardTemplateSequenceSpec):
             raise TypeError("Wildcard Template Manager 출력을 연결하세요.")
-        prompt = _expand_selected_template(
+        scheduled_templates = apply_template_schedule(
             templates.templates,
+            schedule_json,
+        )
+        prompt = _expand_selected_template(
+            scheduled_templates,
             seed,
             queue_group,
             queue_index,
@@ -219,6 +236,7 @@ class WildcardTemplateNode(io.ComfyNode):
             template=template,
             image_count=image_count,
             wildcard_root=str(wildcard_root),
+            template_id="legacy",
         )
         return io.NodeOutput(specification)
 

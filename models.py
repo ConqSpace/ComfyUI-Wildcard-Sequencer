@@ -10,6 +10,7 @@ class WildcardTemplateSpec:
     template: str
     image_count: int
     wildcard_root: str
+    template_id: str = "legacy"
 
     def __post_init__(self) -> None:
         if not self.template.strip():
@@ -20,6 +21,8 @@ class WildcardTemplateSpec:
             raise ValueError("이미지 수량은 1 이상이어야 합니다.")
         if not self.wildcard_root.strip():
             raise ValueError("와일드카드 폴더를 지정해야 합니다.")
+        if not self.template_id.strip():
+            raise ValueError("템플릿 ID를 지정해야 합니다.")
 
 
 @dataclass(frozen=True, slots=True)
