@@ -63,7 +63,7 @@ class TemplateSerializationTests(unittest.TestCase):
         self.assertEqual(templates[0].template, "plain prompt")
         self.assertEqual(templates[0].template_id, "row-1")
 
-    def test_시퀀서_수량을_ID_기준으로_적용한다(self) -> None:
+    def test_시퀀서_공통_수량을_모든_템플릿에_적용한다(self) -> None:
         templates = parse_template_rows(
             json.dumps(
                 [
@@ -76,12 +76,29 @@ class TemplateSerializationTests(unittest.TestCase):
 
         scheduled = apply_template_schedule(
             templates,
-            '[{"id":"b","image_count":70},{"id":"deleted","image_count":9}]',
+            '{"image_count":70}',
         )
 
         self.assertEqual(
             [(template.template_id, template.image_count) for template in scheduled],
-            [("a", 20), ("b", 70)],
+            [("a", 70), ("b", 70)],
+        )
+
+    def test_v04_수량표는_Manager_첫_행의_수량을_공통값으로_승계한다(self) -> None:
+        templates = parse_template_rows(
+            '[{"id":"a","prompt":"A","image_count":20},'
+            '{"id":"b","prompt":"B","image_count":30}]',
+            "wildcards",
+        )
+
+        scheduled = apply_template_schedule(
+            templates,
+            '[{"id":"b","image_count":70},{"id":"a","image_count":40}]',
+        )
+
+        self.assertEqual(
+            [template.image_count for template in scheduled],
+            [40, 40],
         )
 
     def test_빈_스케줄은_Manager의_기존_수량을_승계한다(self) -> None:
@@ -92,7 +109,7 @@ class TemplateSerializationTests(unittest.TestCase):
 
         scheduled = apply_template_schedule(templates, "[]")
 
-        self.assertEqual(scheduled[0].image_count, 35)
+        self.assertEqual([template.image_count for template in scheduled], [35])
 
     def test_잘못된_json과_배열이_아닌_값을_거부한다(self) -> None:
         for value in ("{", "{}", '"row"', "null"):
@@ -156,9 +173,13 @@ class TemplateSerializationTests(unittest.TestCase):
         invalid_values = (
             "{}",
             "{",
+            '"50"',
+            "null",
             '[{"id":"","image_count":1}]',
             '[{"id":"a","image_count":0}]',
             '[{"id":"a","image_count":"50"}]',
+            '{"image_count":0}',
+            '{"image_count":"50"}',
         )
         for value in invalid_values:
             with self.subTest(value=value):
@@ -168,6 +189,8 @@ class TemplateSerializationTests(unittest.TestCase):
     def test_빈_시퀀스를_거부한다(self) -> None:
         with self.assertRaises(ValueError):
             WildcardTemplateSequenceSpec(templates=())
+        with self.assertRaises(ValueError):
+            apply_template_schedule((), '{"image_count":50}')
 
 
 if __name__ == "__main__":

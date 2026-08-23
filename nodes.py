@@ -130,7 +130,7 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
             node_id="WSQ_WildcardSequenceRunner",
             display_name="Wildcard Sequencer",
             category="Wildcard Sequencer",
-            description="Manager의 템플릿을 이미지 할당량 순서대로 순환합니다.",
+            description="Manager의 템플릿을 공통 이미지 수만큼 순서대로 순환합니다.",
             inputs=[
                 WildcardTemplateSequence.Input(
                     "templates",
@@ -140,7 +140,7 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
                 # 기존 워크플로의 위치 기반 widget 값을 밀지 않도록 항상 맨 뒤에 둡니다.
                 io.String.Input(
                     "schedule_json",
-                    display_name="템플릿별 수량",
+                    display_name="공통 이미지 수",
                     default=DEFAULT_SCHEDULE_JSON,
                     multiline=True,
                 ),

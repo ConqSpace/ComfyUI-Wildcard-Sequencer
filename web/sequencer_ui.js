@@ -1,12 +1,12 @@
 import { app } from "../../scripts/app.js";
 import {
-    스케줄_JSON,
-    스케줄_동기화,
+    공통_수량_JSON,
+    공통_수량_읽기,
     이미지_수_정규화,
 } from "./sequence_schedule.mjs";
 
 const 템플릿_관리자_노드 = "WSQ_WildcardTemplateManager";
-const 시퀀서_최소_높이 = 190;
+const 시퀀서_최소_높이 = 112;
 
 function 노드_종류(node) {
     return node?.comfyClass ?? node?.constructor?.comfyClass ?? node?.type;
@@ -66,14 +66,13 @@ function 스타일_설치() {
         .wsq-sequencer {
             box-sizing: border-box;
             display: grid;
-            grid-template-rows: minmax(70px, 1fr) auto;
-            gap: 7px;
+            grid-template-rows: minmax(44px, 1fr) auto;
+            gap: 8px;
             width: 100%;
-            min-width: 310px;
+            min-width: 300px;
             height: 100%;
             min-height: ${시퀀서_최소_높이}px;
-            padding: 7px;
-            overflow: hidden;
+            padding: 8px;
             color: var(--fg-color, #ddd);
             background: var(--comfy-menu-bg, #202020);
             border: 1px solid var(--border-color, #555);
@@ -81,52 +80,35 @@ function 스타일_설치() {
             font: 12px/1.35 system-ui, sans-serif;
         }
 
-        .wsq-sequencer__rows {
-            min-height: 0;
-            overflow: auto;
-            scrollbar-width: thin;
-        }
-
-        .wsq-sequencer__row {
+        .wsq-sequencer__control {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) 72px;
+            grid-template-columns: minmax(0, 1fr) 86px;
             align-items: center;
-            gap: 7px;
-            min-height: 34px;
-            padding: 4px 5px;
-            border-radius: 5px;
+            gap: 12px;
+            padding: 5px 7px;
         }
 
-        .wsq-sequencer__row + .wsq-sequencer__row {
-            margin-top: 2px;
-        }
-
-        .wsq-sequencer__row:hover {
-            background: color-mix(in srgb, var(--p-primary-color, #6da7ff) 8%, transparent);
-        }
-
-        .wsq-sequencer__prompt {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .wsq-sequencer__label {
+            font-weight: 650;
         }
 
         .wsq-sequencer__count-wrap {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             align-items: center;
-            gap: 3px;
+            gap: 4px;
             color: var(--descrip-text, #aaa);
         }
 
         .wsq-sequencer__count {
             box-sizing: border-box;
             width: 100%;
-            min-height: 27px;
-            padding: 3px 4px;
+            min-height: 30px;
+            padding: 4px 6px;
             color: var(--input-text, var(--fg-color, #eee));
             text-align: right;
             font: inherit;
+            font-weight: 650;
             font-variant-numeric: tabular-nums;
             background: var(--comfy-input-bg, #151515);
             border: 1px solid var(--border-color, #555);
@@ -139,24 +121,15 @@ function 스타일_설치() {
             outline-offset: 1px;
         }
 
-        .wsq-sequencer__footer {
+        .wsq-sequencer__summary {
             min-height: 28px;
-            padding: 5px 6px;
+            padding: 6px 7px;
             color: var(--descrip-text, #aaa);
             text-align: right;
             font-variant-numeric: tabular-nums;
             border-top: 1px solid var(--border-color, #444);
         }
 
-        .wsq-sequencer__empty {
-            display: grid;
-            height: 100%;
-            min-height: 70px;
-            place-items: center;
-            padding: 12px;
-            color: var(--descrip-text, #aaa);
-            text-align: center;
-        }
     `;
     document.head.append(style);
 }
@@ -166,7 +139,7 @@ export function 시퀀서_수량_UI_연결(node) {
         (widget) => widget.name === "schedule_json",
     );
     if (!scheduleWidget) {
-        console.warn("[Wildcard Sequencer] 수량 위젯을 찾지 못했습니다.");
+        console.warn("[Wildcard Sequencer] 공통 수량 위젯을 찾지 못했습니다.");
         return;
     }
 
@@ -175,80 +148,68 @@ export function 시퀀서_수량_UI_연결(node) {
 
     const root = document.createElement("section");
     root.className = "wsq-sequencer";
-    root.setAttribute("aria-label", "템플릿별 생성 수량");
+    root.setAttribute("aria-label", "템플릿 공통 생성 수량");
 
-    const rowsContainer = document.createElement("div");
-    rowsContainer.className = "wsq-sequencer__rows";
-    const footer = document.createElement("div");
-    footer.className = "wsq-sequencer__footer";
-    root.append(rowsContainer, footer);
+    const content = document.createElement("div");
+    const summary = document.createElement("div");
+    summary.className = "wsq-sequencer__summary";
+    root.append(content, summary);
 
-    let scheduleRows = [];
+    let templateRows = [];
+    let commonCount = 공통_수량_읽기([], scheduleWidget.value);
     let subscribedManager = null;
     let unsubscribeManager = null;
     let connectionFrame = 0;
 
     const 저장 = () => {
-        위젯_값_저장(scheduleWidget, 스케줄_JSON(scheduleRows), node);
+        위젯_값_저장(scheduleWidget, 공통_수량_JSON(commonCount), node);
     };
 
     const 그리기 = () => {
-        rowsContainer.replaceChildren();
-        if (!subscribedManager) {
-            const empty = document.createElement("div");
-            empty.className = "wsq-sequencer__empty";
-            empty.textContent = "Wildcard Template Manager를 연결하세요.";
-            rowsContainer.append(empty);
-            footer.textContent = "";
-            return;
-        }
+        content.replaceChildren();
+        const control = document.createElement("label");
+        control.className = "wsq-sequencer__control";
+        const label = document.createElement("span");
+        label.className = "wsq-sequencer__label";
+        label.textContent = "템플릿당 이미지 수";
 
-        for (const row of scheduleRows) {
-            const rowElement = document.createElement("div");
-            rowElement.className = "wsq-sequencer__row";
+        const countWrap = document.createElement("span");
+        countWrap.className = "wsq-sequencer__count-wrap";
+        const countInput = document.createElement("input");
+        countInput.type = "number";
+        countInput.className = "wsq-sequencer__count";
+        countInput.min = "1";
+        countInput.max = "1000000";
+        countInput.step = "1";
+        countInput.value = String(commonCount);
+        countInput.setAttribute("aria-label", "템플릿당 이미지 수");
+        const unit = document.createElement("span");
+        unit.textContent = "장";
+        countWrap.append(countInput, unit);
+        control.append(label, countWrap);
+        content.append(control);
 
-            const prompt = document.createElement("span");
-            prompt.className = "wsq-sequencer__prompt";
-            prompt.textContent = row.prompt || "(빈 프롬프트)";
-            prompt.title = row.prompt;
-
-            const countWrap = document.createElement("label");
-            countWrap.className = "wsq-sequencer__count-wrap";
-            const countInput = document.createElement("input");
-            countInput.type = "number";
-            countInput.className = "wsq-sequencer__count";
-            countInput.min = "1";
-            countInput.max = "1000000";
-            countInput.step = "1";
-            countInput.value = String(row.image_count);
-            countInput.setAttribute("aria-label", `${row.prompt} 이미지 수`);
-            const unit = document.createElement("span");
-            unit.textContent = "장";
-            countWrap.append(countInput, unit);
-
-            countInput.addEventListener("change", () => {
-                row.image_count = 이미지_수_정규화(countInput.value);
-                countInput.value = String(row.image_count);
-                저장();
-                합계_갱신();
-            });
-
-            rowElement.append(prompt, countWrap);
-            rowsContainer.append(rowElement);
-        }
+        countInput.addEventListener("change", () => {
+            commonCount = 이미지_수_정규화(countInput.value);
+            countInput.value = String(commonCount);
+            저장();
+            합계_갱신();
+        });
         합계_갱신();
     };
 
     const 합계_갱신 = () => {
-        const total = scheduleRows.reduce(
-            (sum, row) => sum + row.image_count,
-            0,
-        );
-        footer.textContent = `1회전 합계 ${total.toLocaleString()}장`;
+        if (!subscribedManager) {
+            summary.textContent = "Manager를 연결하면 1회전 합계를 계산합니다.";
+            return;
+        }
+        const total = templateRows.length * commonCount;
+        summary.textContent = `${templateRows.length}개 템플릿 · 1회전 ${total.toLocaleString()}장`;
     };
 
-    const 관리자_행_동기화 = (templateRows) => {
-        scheduleRows = 스케줄_동기화(templateRows, scheduleWidget.value);
+    const 관리자_행_동기화 = (nextTemplateRows) => {
+        templateRows = nextTemplateRows;
+        commonCount = 공통_수량_읽기(templateRows, scheduleWidget.value);
         저장();
         그리기();
     };
@@ -268,7 +229,7 @@ export function 시퀀서_수량_UI_연결(node) {
         }
 
         if (!manager) {
-            scheduleRows = [];
+            templateRows = [];
             그리기();
             return;
         }
@@ -315,7 +276,7 @@ export function 시퀀서_수량_UI_연결(node) {
 
     연결_예약();
     requestAnimationFrame(() => {
-        const width = Math.max(node.size?.[0] ?? 0, 350);
+        const width = Math.max(node.size?.[0] ?? 0, 340);
         const computed = node.computeSize?.() ?? node.size;
         node.setSize?.([
             width,

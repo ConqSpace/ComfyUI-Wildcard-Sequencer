@@ -1,24 +1,24 @@
 # ComfyUI Wildcard Sequencer
 
-여러 와일드카드 프롬프트를 한 노드에서 정리하고, 템플릿별 이미지 할당량에 따라 순서대로 실행하는 ComfyUI 커스텀 노드입니다.
+여러 와일드카드 프롬프트를 한 노드에서 정리하고, 템플릿당 공통 이미지 수에 따라 순서대로 실행하는 ComfyUI 커스텀 노드입니다.
 
 ```text
 [Wildcard Template Manager] ─> [Wildcard Sequencer] ─> CLIP Text Encode
-  ├─ portrait of __characters__       ├─ 50장
-  ├─ __styles/lighting__ photo...     ├─ 30장
-  └─ cinematic __camera/angle__       └─ 20장
+  ├─ portrait of __characters__       ┐
+  ├─ __styles/lighting__ photo...     ├─ 템플릿당 50장
+  └─ cinematic __camera/angle__       ┘
 ```
 
 ## 주요 기능
 
 - 한 Manager 노드에서 템플릿 추가, 삭제, 드래그 정렬
-- 와일드카드 목록 새로고침과 폴더 전체 템플릿 추가
+- 와일드카드 목록 새로고침과 서버 기준 폴더 선택 불러오기
 - Manager 노드의 세로 길이에 맞춰 템플릿 목록과 검색 결과 영역 확장
 - 각 템플릿에 와일드카드 하나, 여러 와일드카드, 일반 문장을 자유롭게 조합
 - `{red|blue|green}` 인라인 랜덤 선택과 중첩 선택 지원
 - 불편한 파일 드롭다운 대신 공유 검색창에서 와일드카드 토큰명 검색
 - 검색 결과 클릭 또는 `Enter`로 현재 커서 위치에 `__token__, ` 자동 삽입
-- 각 템플릿에 지정한 이미지 수만큼 실행한 뒤 다음 행으로 이동
+- Sequencer에서 지정한 공통 이미지 수만큼 실행한 뒤 다음 행으로 이동
 - 마지막 행까지 실행하면 처음부터 다시 순환
 - 새 Queue 작업마다 첫 번째 행부터 다시 시작
 - 이미지마다 각 와일드카드를 독립적으로 무작위 추첨
@@ -40,10 +40,10 @@ ComfyUI를 재시작하고 브라우저를 강력 새로고침하세요. 별도 
 ## 빠른 사용법
 
 1. `Wildcard Template Manager`와 `Wildcard Sequencer`를 하나씩 추가합니다.
-2. Manager의 `+ 템플릿`으로 행을 만들고 프롬프트를 입력합니다. `전체 추가`를 누르면 폴더의 와일드카드를 한 번에 행으로 만들 수 있습니다.
+2. Manager의 `+ 템플릿`으로 행을 만들고 프롬프트를 입력합니다. `폴더 불러오기`를 누르면 서버가 인식한 폴더를 탐색할 수 있습니다.
 3. `≡` 핸들을 드래그해 실행 순서를 정합니다. 필요 없는 행은 `×`로 제거합니다.
 4. Manager의 `templates` 출력을 Sequencer의 `templates` 입력에 연결합니다.
-5. Sequencer에 나타난 각 템플릿의 이미지 수를 설정합니다.
+5. Sequencer의 `템플릿당 이미지 수`를 설정합니다. 이 수량이 모든 템플릿에 동일하게 적용됩니다.
 6. Sequencer의 `prompt` 출력을 `CLIP Text Encode`에 연결합니다.
 7. `Empty Latent Image` 등의 `batch_size`를 `1`로 설정합니다.
 8. ComfyUI의 Run/Queue Batch Count에 전체 생성량을 입력하고 Queue를 실행합니다.
@@ -77,19 +77,20 @@ Queue 버튼을 다시 누르면 이전 작업의 다음 순서가 아니라 A�
 - 행 안에는 일반 문장과 `__wildcard__` 토큰을 원하는 만큼 섞을 수 있습니다.
 - `≡` 드래그 순서가 실행 순서이며 `×`를 누르면 그 행이 순환에서 빠집니다.
 - `↻`은 폴더를 다시 스캔해 검색 목록만 갱신하며 기존 템플릿은 건드리지 않습니다.
-- `전체 추가`는 폴더와 하위 폴더의 와일드카드를 파일당 한 행으로 추가하고, 이미 포함된 토큰은 건너뜁니다.
+- `폴더 불러오기`는 노드 밖의 모달에서 서버 기준 폴더를 탐색합니다.
+- `현재 폴더 추가`는 선택한 폴더에 직접 들어 있는 와일드카드만 파일당 한 행으로 추가합니다. 하위 폴더는 자동으로 포함하지 않으며 이미 포함된 토큰은 건너뜁니다.
 - 출력은 전용 `WILDCARD_TEMPLATE_SEQUENCE` 타입입니다.
 
 ### Wildcard Sequencer
 
 - Manager 출력 하나만 받습니다.
-- 연결된 템플릿별 이미지 수와 1회전 합계를 표시합니다.
-- Manager에서 순서를 바꾸거나 행을 삭제해도 수량은 템플릿 ID를 따라갑니다.
+- `템플릿당 이미지 수` 하나를 모든 Manager 행에 공통으로 적용합니다.
+- 연결된 템플릿 수와 공통 수량으로 계산한 1회전 합계를 표시합니다.
 - `seed`와 작업 내 이미지 번호가 같으면 같은 결과를 재현합니다.
 - Queue 작업이 새로 시작되면 순서 카운터는 0으로 초기화됩니다.
 - 작업 내 이미지 번호와 Queue 작업 ID는 브라우저 확장이 자동으로 기록합니다.
 
-이전 Manager 워크플로를 처음 열면 기존 행의 이미지 수가 새 Sequencer 수량표로 자동 승계됩니다. 초기 버전의 `Wildcard Template` 여러 개와 Autogrow 방식 `Wildcard Sequencer`도 저장된 워크플로 호환을 위해 deprecated 노드로 남아 있습니다.
+v0.4의 템플릿별 수량표는 Manager 순서상 첫 번째 유효 수량을 공통값으로 자동 승계합니다. 그 이전 Manager 워크플로는 첫 행의 이미지 수를 사용합니다. 초기 버전의 `Wildcard Template` 여러 개와 Autogrow 방식 `Wildcard Sequencer`도 저장된 워크플로 호환을 위해 deprecated 노드로 남아 있습니다.
 
 ## 와일드카드 파일
 
@@ -154,8 +155,10 @@ __styles/lighting.txt__
 py -3.12 -m unittest discover -s tests -v
 node --check web/wildcard_ui.js
 node --check web/template_manager_ui.js
+node --check web/sequencer_ui.js
+node --check web/folder_picker_ui.js
 node tests/test_prompt_editing.mjs
 node tests/test_template_ui.mjs
 ```
 
-테스트는 템플릿·수량표 직렬화, 폴더 전체 추가와 중복 제거, 경계와 재순환, 연결 제거, 시드 재현성, 인라인 선택식, 토큰 삽입, 중첩 와일드카드, 경로 이탈 및 순환 참조 방지를 검증합니다.
+테스트는 템플릿·공통 수량 직렬화, 현재 폴더 판별과 중복 제거, 경계와 재순환, 연결 제거, 시드 재현성, 인라인 선택식, 토큰 삽입, 중첩 와일드카드, 경로 이탈 및 순환 참조 방지를 검증합니다.

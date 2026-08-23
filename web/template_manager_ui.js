@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { 폴더_선택기_만들기 } from "./folder_picker_ui.js";
 import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
 import { 폴더_와일드카드_추가 } from "./template_rows.mjs";
 
@@ -134,7 +135,7 @@ function 스타일_설치() {
         }
 
         .wsq-manager__add,
-        .wsq-manager__bulk,
+        .wsq-manager__folder,
         .wsq-manager__refresh,
         .wsq-manager__toggle,
         .wsq-manager__remove,
@@ -148,7 +149,7 @@ function 스타일_설치() {
         }
 
         .wsq-manager__add,
-        .wsq-manager__bulk,
+        .wsq-manager__folder,
         .wsq-manager__refresh {
             min-height: 28px;
             padding: 4px 9px;
@@ -168,20 +169,20 @@ function 스타일_설치() {
             padding: 4px;
         }
 
-        .wsq-manager__bulk:disabled,
+        .wsq-manager__folder:disabled,
         .wsq-manager__refresh:disabled {
             opacity: .45;
             cursor: wait;
         }
 
         .wsq-manager__add:hover,
-        .wsq-manager__bulk:hover:not(:disabled),
+        .wsq-manager__folder:hover:not(:disabled),
         .wsq-manager__refresh:hover:not(:disabled) {
             background: color-mix(in srgb, var(--p-primary-color, #6da7ff) 14%, var(--comfy-input-bg, #303030));
         }
 
         .wsq-manager__add:active,
-        .wsq-manager__bulk:active:not(:disabled),
+        .wsq-manager__folder:active:not(:disabled),
         .wsq-manager__refresh:active:not(:disabled) {
             transform: scale(.97);
         }
@@ -371,18 +372,18 @@ export function 템플릿_관리자_연결(node) {
 
     const actions = document.createElement("div");
     actions.className = "wsq-manager__actions";
-    const bulkButton = document.createElement("button");
-    bulkButton.type = "button";
-    bulkButton.className = "wsq-manager__bulk";
-    bulkButton.textContent = "전체 추가";
-    bulkButton.title = "폴더와 하위 폴더의 와일드카드를 템플릿으로 추가";
+    const folderButton = document.createElement("button");
+    folderButton.type = "button";
+    folderButton.className = "wsq-manager__folder";
+    folderButton.textContent = "폴더 불러오기";
+    folderButton.title = "서버의 와일드카드 폴더에서 현재 폴더 파일만 추가";
     const refreshButton = document.createElement("button");
     refreshButton.type = "button";
     refreshButton.className = "wsq-manager__refresh";
     refreshButton.textContent = "↻";
     refreshButton.title = "와일드카드 목록 새로고침";
     refreshButton.setAttribute("aria-label", "와일드카드 목록 새로고침");
-    actions.append(bulkButton, refreshButton);
+    actions.append(folderButton, refreshButton);
     toolbar.append(addButton, actions);
 
     const rowsContainer = document.createElement("div");
@@ -650,7 +651,7 @@ export function 템플릿_관리자_연결(node) {
         requestNumber += 1;
         const thisRequest = requestNumber;
         loading = true;
-        bulkButton.disabled = true;
+        folderButton.disabled = true;
         refreshButton.disabled = true;
         errorMessage = "";
         검색_그리기();
@@ -685,12 +686,43 @@ export function 템플릿_관리자_연결(node) {
         } finally {
             if (thisRequest === requestNumber) {
                 loading = false;
-                bulkButton.disabled = false;
+                folderButton.disabled = false;
                 refreshButton.disabled = false;
                 검색_그리기();
             }
         }
     };
+
+    const 폴더_선택기 = 폴더_선택기_만들기({
+        loadItems: 목록_불러오기,
+        importItems: (selectedItems) => {
+            const imported = 폴더_와일드카드_추가(
+                rows,
+                selectedItems,
+                새_행_식별자,
+                최대_템플릿_개수,
+            );
+            rows = imported.rows;
+            if (imported.added > 0) {
+                activeRowId = rows.at(-1).id;
+                저장();
+                행_그리기();
+                requestAnimationFrame(() => {
+                    rowsContainer.scrollTop = rowsContainer.scrollHeight;
+                });
+            }
+
+            clearTimeout(actionTimer);
+            folderButton.textContent = imported.limited > 0
+                ? `${imported.added}개 추가 · 한도 도달`
+                : imported.added > 0
+                    ? `${imported.added}개 추가됨`
+                    : "추가할 항목 없음";
+            actionTimer = setTimeout(() => {
+                folderButton.textContent = "폴더 불러오기";
+            }, 1800);
+        },
+    });
 
     const 펼침_적용 = (nextExpanded, saveState = false, focusSearch = false) => {
         expanded = Boolean(nextExpanded);
@@ -739,38 +771,7 @@ export function 템플릿_관리자_연결(node) {
             refreshButton.textContent = "↻";
         }, 1400);
     });
-    bulkButton.addEventListener("click", async () => {
-        const loadedItems = await 목록_불러오기();
-        if (loadedItems === null) {
-            return;
-        }
-
-        const imported = 폴더_와일드카드_추가(
-            rows,
-            loadedItems,
-            새_행_식별자,
-            최대_템플릿_개수,
-        );
-        rows = imported.rows;
-        if (imported.added > 0) {
-            activeRowId = rows.at(-1).id;
-            저장();
-            행_그리기();
-            requestAnimationFrame(() => {
-                rowsContainer.scrollTop = rowsContainer.scrollHeight;
-            });
-        }
-
-        clearTimeout(actionTimer);
-        bulkButton.textContent = imported.limited > 0
-            ? `${imported.added}개 추가 · 한도 도달`
-            : imported.added > 0
-                ? `${imported.added}개 추가됨`
-                : "추가할 항목 없음";
-        actionTimer = setTimeout(() => {
-            bulkButton.textContent = "전체 추가";
-        }, 1800);
-    });
+    folderButton.addEventListener("click", () => 폴더_선택기.open());
     toggle.addEventListener("click", () => {
         const nextExpanded = !expanded;
         펼침_적용(nextExpanded, true, nextExpanded);
@@ -838,6 +839,7 @@ export function 템플릿_관리자_연결(node) {
         cancelAnimationFrame(searchFrame);
         clearTimeout(directoryTimer);
         clearTimeout(actionTimer);
+        폴더_선택기.destroy();
         rowListeners.clear();
         delete node.wsqGetTemplateRows;
         delete node.wsqSubscribeTemplateRows;

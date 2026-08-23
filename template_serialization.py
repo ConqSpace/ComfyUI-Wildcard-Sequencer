@@ -78,15 +78,44 @@ def apply_template_schedule(
     templates: tuple[WildcardTemplateSpec, ...],
     schedule_json: str,
 ) -> tuple[WildcardTemplateSpec, ...]:
-    """Sequencer 수량표를 ID 기준으로 적용하고 Manager의 기존 수량은 폴백으로 둡니다."""
+    """Sequencer의 공통 수량을 모든 템플릿에 적용합니다.
+
+    v0.4가 저장한 템플릿별 배열도 읽되 Manager 순서상 첫 번째 유효 수량을
+    공통값으로 승계합니다. 빈 배열은 이전 Manager의 첫 행 수량을 사용합니다.
+    """
+
+    if not templates:
+        raise ValueError("공통 수량을 적용할 템플릿이 없습니다.")
 
     try:
         rows: Any = json.loads(schedule_json)
     except (json.JSONDecodeError, TypeError) as error:
         raise ValueError("Sequencer 수량 JSON이 올바르지 않습니다.") from error
 
-    if not isinstance(rows, list):
-        raise ValueError("Sequencer 수량은 배열이어야 합니다.")
+    if isinstance(rows, dict):
+        image_count = rows.get("image_count")
+        _validate_image_count(image_count, "공통")
+        common_count = image_count
+    elif isinstance(rows, list):
+        common_count = _read_legacy_schedule_count(templates, rows)
+    else:
+        raise ValueError("Sequencer 수량 형식이 올바르지 않습니다.")
+
+    return tuple(
+        WildcardTemplateSpec(
+            template=template.template,
+            image_count=common_count,
+            wildcard_root=template.wildcard_root,
+            template_id=template.template_id,
+        )
+        for template in templates
+    )
+
+
+def _read_legacy_schedule_count(
+    templates: tuple[WildcardTemplateSpec, ...],
+    rows: list[Any],
+) -> int:
     if len(rows) > MAX_TEMPLATE_COUNT:
         raise ValueError(f"수량 항목은 최대 {MAX_TEMPLATE_COUNT}개까지 저장할 수 있습니다.")
 
@@ -101,20 +130,19 @@ def apply_template_schedule(
         normalized_id = template_id.strip()
         if normalized_id in counts_by_id:
             raise ValueError(f"중복된 수량 항목 ID입니다: {normalized_id}")
-        if isinstance(image_count, bool) or not isinstance(image_count, int):
-            raise ValueError(f"{index}번째 이미지 수는 정수여야 합니다.")
-        if not 1 <= image_count <= MAX_IMAGE_COUNT:
-            raise ValueError(
-                f"{index}번째 이미지 수는 1~{MAX_IMAGE_COUNT:,} 범위여야 합니다."
-            )
+        _validate_image_count(image_count, f"{index}번째")
         counts_by_id[normalized_id] = image_count
 
-    return tuple(
-        WildcardTemplateSpec(
-            template=template.template,
-            image_count=counts_by_id.get(template.template_id, template.image_count),
-            wildcard_root=template.wildcard_root,
-            template_id=template.template_id,
+    for template in templates:
+        if template.template_id in counts_by_id:
+            return counts_by_id[template.template_id]
+    return templates[0].image_count
+
+
+def _validate_image_count(value: Any, label: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{label} 이미지 수는 정수여야 합니다.")
+    if not 1 <= value <= MAX_IMAGE_COUNT:
+        raise ValueError(
+            f"{label} 이미지 수는 1~{MAX_IMAGE_COUNT:,} 범위여야 합니다."
         )
-        for template in templates
-    )

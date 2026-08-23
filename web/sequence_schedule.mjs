@@ -1,4 +1,4 @@
-function 이미지_수_정규화(value, fallback = 50) {
+export function 이미지_수_정규화(value, fallback = 50) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
         return fallback;
@@ -6,43 +6,39 @@ function 이미지_수_정규화(value, fallback = 50) {
     return Math.min(1_000_000, Math.max(1, Math.trunc(number)));
 }
 
-export function 스케줄_동기화(templateRows, scheduleValue) {
-    let savedRows = [];
+export function 공통_수량_읽기(templateRows, scheduleValue) {
+    let savedValue = null;
     try {
-        const parsed = JSON.parse(String(scheduleValue ?? ""));
-        if (Array.isArray(parsed)) {
-            savedRows = parsed;
-        }
+        savedValue = JSON.parse(String(scheduleValue ?? ""));
     } catch {
-        savedRows = [];
+        savedValue = null;
     }
 
-    const savedCounts = new Map();
-    for (const row of savedRows) {
-        const id = String(row?.id ?? "").trim();
-        if (id) {
-            savedCounts.set(id, 이미지_수_정규화(row.image_count));
+    if (savedValue && !Array.isArray(savedValue) && typeof savedValue === "object") {
+        return 이미지_수_정규화(savedValue.image_count);
+    }
+
+    if (Array.isArray(savedValue)) {
+        const countsById = new Map();
+        for (const row of savedValue) {
+            const id = String(row?.id ?? "").trim();
+            if (id) {
+                countsById.set(id, 이미지_수_정규화(row.image_count));
+            }
+        }
+        for (const row of templateRows) {
+            const id = String(row?.id ?? "").trim();
+            if (countsById.has(id)) {
+                return countsById.get(id);
+            }
         }
     }
 
-    return templateRows.map((row, index) => {
-        const id = String(row?.id ?? `row-${index + 1}`).trim();
-        const legacyCount = 이미지_수_정규화(row?.image_count);
-        return {
-            id,
-            prompt: String(row?.prompt ?? ""),
-            image_count: savedCounts.get(id) ?? legacyCount,
-        };
+    return 이미지_수_정규화(templateRows[0]?.image_count);
+}
+
+export function 공통_수량_JSON(imageCount) {
+    return JSON.stringify({
+        image_count: 이미지_수_정규화(imageCount),
     });
 }
-
-export function 스케줄_JSON(scheduleRows) {
-    return JSON.stringify(
-        scheduleRows.map((row) => ({
-            id: row.id,
-            image_count: 이미지_수_정규화(row.image_count),
-        })),
-    );
-}
-
-export { 이미지_수_정규화 };
