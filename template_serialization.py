@@ -101,10 +101,23 @@ def apply_template_schedule(
     else:
         raise ValueError("Sequencer 수량 형식이 올바르지 않습니다.")
 
+    return apply_common_image_count(templates, common_count)
+
+
+def apply_common_image_count(
+    templates: tuple[WildcardTemplateSpec, ...],
+    image_count: int,
+) -> tuple[WildcardTemplateSpec, ...]:
+    """ComfyUI 기본 숫자 위젯의 공통 수량을 모든 템플릿에 적용합니다."""
+
+    if not templates:
+        raise ValueError("공통 수량을 적용할 템플릿이 없습니다.")
+    _validate_image_count(image_count, "공통")
+
     return tuple(
         WildcardTemplateSpec(
             template=template.template,
-            image_count=common_count,
+            image_count=image_count,
             wildcard_root=template.wildcard_root,
             template_id=template.template_id,
         )

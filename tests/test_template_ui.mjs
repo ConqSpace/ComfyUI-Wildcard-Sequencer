@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { 공통_수량_JSON, 공통_수량_읽기 } from "../web/sequence_schedule.mjs";
+import {
+    공통_수량_읽기,
+    이전_공통_수량_읽기,
+    회전_합계_문구,
+} from "../web/sequence_schedule.mjs";
 import {
     폴더_내용_만들기,
     폴더_와일드카드_추가,
@@ -59,6 +63,15 @@ assert.equal(
     40,
 );
 assert.equal(공통_수량_읽기(templates, "[]"), 20);
-assert.equal(공통_수량_JSON(65), '{"image_count":65}');
+assert.equal(이전_공통_수량_읽기([], '{"image_count":80}'), 80);
+assert.equal(
+    이전_공통_수량_읽기(
+        templates,
+        '[{"id":"b","image_count":70},{"id":"a","image_count":40}]',
+    ),
+    40,
+);
+assert.equal(이전_공통_수량_읽기([], "[]"), null);
+assert.equal(회전_합계_문구(3, 50), "3개 × 50장 = 150장");
 
 console.log("template UI tests: OK");

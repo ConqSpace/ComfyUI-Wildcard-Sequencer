@@ -6,7 +6,7 @@
 [Wildcard Template Manager] ─> [Wildcard Sequencer] ─> CLIP Text Encode
   ├─ portrait of __characters__       ┐
   ├─ __styles/lighting__ photo...     ├─ 템플릿당 50장
-  └─ cinematic __camera/angle__       ┘
+  └─ cinematic __camera/angle__       ┘  1회전 합계 150장
 ```
 
 ## 주요 기능
@@ -85,12 +85,13 @@ Queue 버튼을 다시 누르면 이전 작업의 다음 순서가 아니라 A�
 
 - Manager 출력 하나만 받습니다.
 - `템플릿당 이미지 수` 하나를 모든 Manager 행에 공통으로 적용합니다.
-- 연결된 템플릿 수와 공통 수량으로 계산한 1회전 합계를 표시합니다.
+- ComfyUI 기본 숫자 위젯을 사용하며 별도의 커스텀 패널을 표시하지 않습니다.
+- 읽기 전용 기본 위젯에 `3개 × 50장 = 150장` 형식으로 1회전 합계를 표시합니다.
 - `seed`와 작업 내 이미지 번호가 같으면 같은 결과를 재현합니다.
 - Queue 작업이 새로 시작되면 순서 카운터는 0으로 초기화됩니다.
 - 작업 내 이미지 번호와 Queue 작업 ID는 브라우저 확장이 자동으로 기록합니다.
 
-v0.4의 템플릿별 수량표는 Manager 순서상 첫 번째 유효 수량을 공통값으로 자동 승계합니다. 그 이전 Manager 워크플로는 첫 행의 이미지 수를 사용합니다. 초기 버전의 `Wildcard Template` 여러 개와 Autogrow 방식 `Wildcard Sequencer`도 저장된 워크플로 호환을 위해 deprecated 노드로 남아 있습니다.
+v0.4의 템플릿별 수량표와 v0.5의 공통 수량 데이터는 새 기본 숫자 위젯으로 자동 승계됩니다. 그 이전 Manager 워크플로는 첫 행의 이미지 수를 사용합니다. 초기 버전의 `Wildcard Template` 여러 개와 Autogrow 방식 `Wildcard Sequencer`도 저장된 워크플로 호환을 위해 deprecated 노드로 남아 있습니다.
 
 ## 와일드카드 파일
 

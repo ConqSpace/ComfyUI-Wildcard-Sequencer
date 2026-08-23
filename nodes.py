@@ -7,7 +7,7 @@ from .sequencing import create_image_rng, select_template
 from .template_serialization import (
     DEFAULT_SCHEDULE_JSON,
     DEFAULT_TEMPLATES_JSON,
-    apply_template_schedule,
+    apply_common_image_count,
     parse_template_rows,
 )
 from .wildcard_engine import WildcardExpander, resolve_wildcard_root
@@ -140,9 +140,19 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
                 # 기존 워크플로의 위치 기반 widget 값을 밀지 않도록 항상 맨 뒤에 둡니다.
                 io.String.Input(
                     "schedule_json",
-                    display_name="공통 이미지 수",
+                    display_name="이전 수량 데이터",
                     default=DEFAULT_SCHEDULE_JSON,
                     multiline=True,
+                    advanced=True,
+                    socketless=True,
+                ),
+                io.Int.Input(
+                    "images_per_template",
+                    display_name="템플릿당 이미지 수",
+                    default=50,
+                    min=1,
+                    max=1_000_000,
+                    step=1,
                 ),
             ],
             outputs=[io.String.Output(display_name="prompt")],
@@ -159,12 +169,15 @@ class WildcardSequenceRunnerNode(io.ComfyNode):
         queue_index: int,
         images_per_execution: int,
         schedule_json: str,
+        images_per_template: int,
     ) -> io.NodeOutput:
         if not isinstance(templates, WildcardTemplateSequenceSpec):
             raise TypeError("Wildcard Template Manager 출력을 연결하세요.")
-        scheduled_templates = apply_template_schedule(
+        # schedule_json은 v0.4~v0.5 워크플로의 위치 호환을 위해 남겨 둡니다.
+        _ = schedule_json
+        scheduled_templates = apply_common_image_count(
             templates.templates,
-            schedule_json,
+            images_per_template,
         )
         prompt = _expand_selected_template(
             scheduled_templates,

@@ -24,6 +24,7 @@ WildcardTemplateSequenceSpec = models.WildcardTemplateSequenceSpec
 MAX_TEMPLATE_COUNT = serialization.MAX_TEMPLATE_COUNT
 parse_template_rows = serialization.parse_template_rows
 apply_template_schedule = serialization.apply_template_schedule
+apply_common_image_count = serialization.apply_common_image_count
 
 
 class TemplateSerializationTests(unittest.TestCase):
@@ -74,10 +75,7 @@ class TemplateSerializationTests(unittest.TestCase):
             "wildcards",
         )
 
-        scheduled = apply_template_schedule(
-            templates,
-            '{"image_count":70}',
-        )
+        scheduled = apply_common_image_count(templates, 70)
 
         self.assertEqual(
             [(template.template_id, template.image_count) for template in scheduled],
@@ -185,12 +183,18 @@ class TemplateSerializationTests(unittest.TestCase):
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     apply_template_schedule(templates, value)
+        for count in (True, 0, -1, 1.5, "50", 1_000_001):
+            with self.subTest(common_count=count):
+                with self.assertRaises(ValueError):
+                    apply_common_image_count(templates, count)
 
     def test_빈_시퀀스를_거부한다(self) -> None:
         with self.assertRaises(ValueError):
             WildcardTemplateSequenceSpec(templates=())
         with self.assertRaises(ValueError):
             apply_template_schedule((), '{"image_count":50}')
+        with self.assertRaises(ValueError):
+            apply_common_image_count((), 50)
 
 
 if __name__ == "__main__":
