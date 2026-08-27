@@ -6,7 +6,7 @@
 [Wildcard Template Manager] ─> [Wildcard Sequencer] ─> CLIP Text Encode
   ├─ portrait of __characters__       ┐
   ├─ __styles/lighting__ photo...     ├─ 템플릿당 50장
-  └─ cinematic __camera/angle__       ┘  1회전 합계 150장
+  └─ cinematic __camera/angle__       ┘  적재량 150
 ```
 
 ## 주요 기능
@@ -86,7 +86,7 @@ Queue 버튼을 다시 누르면 이전 작업의 다음 순서가 아니라 A�
 - Manager 출력 하나만 받습니다.
 - `템플릿당 이미지 수` 하나를 모든 Manager 행에 공통으로 적용합니다.
 - ComfyUI 기본 숫자 위젯을 사용하며 별도의 커스텀 패널을 표시하지 않습니다.
-- 읽기 전용 기본 위젯에 `3개 × 50장 = 150장` 형식으로 1회전 합계를 표시합니다.
+- 읽기 전용 기본 위젯에 한 회전의 전체 이미지 수를 `적재량 150`처럼 간결하게 표시합니다.
 - `seed`와 작업 내 이미지 번호가 같으면 같은 결과를 재현합니다.
 - Queue 작업이 새로 시작되면 순서 카운터는 0으로 초기화됩니다.
 - 작업 내 이미지 번호와 Queue 작업 ID는 브라우저 확장이 자동으로 기록합니다.

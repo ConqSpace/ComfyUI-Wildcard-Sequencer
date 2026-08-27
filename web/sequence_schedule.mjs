@@ -6,14 +6,14 @@ export function 이미지_수_정규화(value, fallback = 50) {
     return Math.min(1_000_000, Math.max(1, Math.trunc(number)));
 }
 
-export function 회전_합계_문구(templateCount, imageCount) {
+export function 적재량_문구(templateCount, imageCount) {
     const normalizedTemplateCount = Math.max(
         0,
         Math.trunc(Number(templateCount) || 0),
     );
     const normalizedImageCount = 이미지_수_정규화(imageCount);
     const total = normalizedTemplateCount * normalizedImageCount;
-    return `${normalizedTemplateCount}개 × ${normalizedImageCount.toLocaleString()}장 = ${total.toLocaleString()}장`;
+    return total.toLocaleString();
 }
 
 export function 공통_수량_읽기(templateRows, scheduleValue) {

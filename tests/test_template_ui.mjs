@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
     공통_수량_읽기,
     이전_공통_수량_읽기,
-    회전_합계_문구,
+    적재량_문구,
 } from "../web/sequence_schedule.mjs";
 import {
     폴더_내용_만들기,
@@ -72,6 +72,7 @@ assert.equal(
     40,
 );
 assert.equal(이전_공통_수량_읽기([], "[]"), null);
-assert.equal(회전_합계_문구(3, 50), "3개 × 50장 = 150장");
+assert.equal(적재량_문구(3, 50), "150");
+assert.equal(적재량_문구(0, 50), "0");
 
 console.log("template UI tests: OK");

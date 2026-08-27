@@ -2,7 +2,7 @@ import { app } from "../../scripts/app.js";
 import {
     이미지_수_정규화,
     이전_공통_수량_읽기,
-    회전_합계_문구,
+    적재량_문구,
 } from "./sequence_schedule.mjs";
 
 const 템플릿_관리자_노드 = "WSQ_WildcardTemplateManager";
@@ -65,7 +65,7 @@ export function 시퀀서_수량_UI_연결(node) {
     const summaryWidget = node.addWidget(
         "text",
         "wsq_cycle_summary",
-        "Manager 연결 전",
+        "0",
         () => {},
         {
             read_only: true,
@@ -73,7 +73,7 @@ export function 시퀀서_수량_UI_연결(node) {
             hideInPanel: true,
         },
     );
-    summaryWidget.label = "1회전 합계";
+    summaryWidget.label = "적재량";
     summaryWidget.serialize = false;
     summaryWidget.options ??= {};
     summaryWidget.options.read_only = true;
@@ -89,12 +89,8 @@ export function 시퀀서_수량_UI_연결(node) {
     const originalCountCallback = countWidget.callback;
 
     const 합계_갱신 = () => {
-        if (!subscribedManager) {
-            summaryWidget.value = "Manager 연결 전";
-        } else {
-            const count = 이미지_수_정규화(countWidget.value);
-            summaryWidget.value = 회전_합계_문구(templateRows.length, count);
-        }
+        const count = 이미지_수_정규화(countWidget.value);
+        summaryWidget.value = 적재량_문구(templateRows.length, count);
         node.setDirtyCanvas?.(true, true);
         app.graph?.setDirtyCanvas?.(true, true);
     };
