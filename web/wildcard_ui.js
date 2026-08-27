@@ -3,6 +3,7 @@ import { api } from "../../scripts/api.js";
 import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
 import { 시퀀서_수량_UI_연결 } from "./sequencer_ui.js";
 import { 템플릿_관리자_연결 } from "./template_manager_ui.js";
+import { 와일드카드_검색 } from "./wildcard_search.mjs";
 
 const 템플릿_노드 = "WSQ_WildcardTemplate";
 const 템플릿_관리자_노드 = "WSQ_WildcardTemplateManager";
@@ -11,7 +12,6 @@ const 시퀀서_노드들 = new Set([
     새_시퀀서_노드,
     "WSQ_WildcardSequencer",
 ]);
-const 검색_최대_개수 = 40;
 const 검색기_열림_속성 = "wsq_picker_expanded";
 const 검색기_접힌_높이 = 40;
 const 검색기_펼친_높이 = 200;
@@ -314,15 +314,6 @@ function 항목_정규화(item) {
     };
 }
 
-function 검색어_포함(item, query) {
-    const 검색_대상 = item.token.toLocaleLowerCase();
-    return query
-        .toLocaleLowerCase()
-        .split(/\s+/)
-        .filter(Boolean)
-        .every((낱말) => 검색_대상.includes(낱말));
-}
-
 function 위젯_값_알리기(widget, value, node) {
     widget.value = value;
     widget.callback?.(value);
@@ -532,10 +523,7 @@ function 와일드카드_선택기_연결(node) {
         }
 
         const query = search.value.trim();
-        const 검색_결과 = (query
-            ? 항목들.filter((item) => 검색어_포함(item, query))
-            : 항목들
-        ).slice(0, 검색_최대_개수);
+        const 검색_결과 = 와일드카드_검색(항목들, query);
 
         results.replaceChildren();
 

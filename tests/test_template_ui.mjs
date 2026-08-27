@@ -9,6 +9,7 @@ import {
     폴더_내용_만들기,
     폴더_와일드카드_추가,
 } from "../web/template_rows.mjs";
+import { 와일드카드_검색 } from "../web/wildcard_search.mjs";
 
 
 let nextId = 0;
@@ -74,5 +75,13 @@ assert.equal(
 assert.equal(이전_공통_수량_읽기([], "[]"), null);
 assert.equal(적재량_문구(3, 50), "150");
 assert.equal(적재량_문구(0, 50), "0");
+
+const manySearchResults = Array.from(
+    { length: 100 },
+    (_, index) => ({ token: `characters/person-${index}` }),
+);
+assert.equal(와일드카드_검색(manySearchResults, "person").length, 100);
+assert.equal(와일드카드_검색(manySearchResults, "person 99")[0].token, "characters/person-99");
+assert.equal(와일드카드_검색(manySearchResults, "").length, 100);
 
 console.log("template UI tests: OK");

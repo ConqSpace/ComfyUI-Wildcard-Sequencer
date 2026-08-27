@@ -3,8 +3,8 @@ import { api } from "../../scripts/api.js";
 import { 폴더_선택기_만들기 } from "./folder_picker_ui.js";
 import { 와일드카드_토큰_삽입 } from "./prompt_editing.mjs";
 import { 폴더_와일드카드_추가 } from "./template_rows.mjs";
+import { 와일드카드_검색 } from "./wildcard_search.mjs";
 
-const 검색_최대_개수 = 40;
 const 최대_템플릿_개수 = 256;
 const 매니저_최소_높이 = 350;
 const 검색기_열림_속성 = "wsq_manager_picker_expanded";
@@ -77,15 +77,6 @@ function 위젯_값_저장(widget, value, node) {
     widget.callback?.(value);
     node.setDirtyCanvas?.(true, true);
     app.graph?.setDirtyCanvas?.(true, true);
-}
-
-function 검색어_포함(item, query) {
-    const 검색_대상 = item.token.toLocaleLowerCase();
-    return query
-        .toLocaleLowerCase()
-        .split(/\s+/)
-        .filter(Boolean)
-        .every((낱말) => 검색_대상.includes(낱말));
 }
 
 function 항목_정규화(item) {
@@ -603,10 +594,7 @@ export function 템플릿_관리자_연결(node) {
         }
 
         const query = search.value.trim();
-        const filtered = (query
-            ? items.filter((item) => 검색어_포함(item, query))
-            : items
-        ).slice(0, 검색_최대_개수);
+        const filtered = 와일드카드_검색(items, query);
         results.replaceChildren();
 
         if (!filtered.length) {
