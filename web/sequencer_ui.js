@@ -69,17 +69,14 @@ export function 시퀀서_수량_UI_연결(node) {
         () => {},
         {
             read_only: true,
-            disabled: true,
             serialize: false,
             hideInPanel: true,
         },
     );
     summaryWidget.label = "1회전 합계";
     summaryWidget.serialize = false;
-    summaryWidget.disabled = true;
     summaryWidget.options ??= {};
     summaryWidget.options.read_only = true;
-    summaryWidget.options.disabled = true;
     summaryWidget.options.serialize = false;
     summaryWidget.options.hideInPanel = true;
 
